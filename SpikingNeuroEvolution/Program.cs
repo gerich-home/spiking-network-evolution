@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
+using ScottPlot;
 using static System.Math;
 
 namespace SpikingNeuroEvolution
@@ -13,27 +15,28 @@ namespace SpikingNeuroEvolution
 
         private readonly double a = 0.02;
         private readonly double b = 0.2;
-        private readonly double c = -65;
+        private readonly double c = -50;
         private readonly double d = 2;
         private readonly double ut = 30;
 
         public double U { get; private set; } = -65;
-        private double u2;
+        public double U2;
 
         public readonly List<double> Spikes = new List<double>();
 
         public void Update(double t, double dt, double I)
         {
-            var du_dt = 0.04 * U * U + 5 * U + 140 - u2 + I;
-            var du2_dt = a * (b * U - u2);
+            // https://www.simbrain.net/Documentation/docs/Pages/Network/neuron/Izhikevich.html
+            var du_dt = 0.04 * U * U + 5 * U + 140 - U2 + I;
+            var du2_dt = a * (b * U - U2);
 
             U += dt * du_dt;
-            u2 += dt * du2_dt;
+            U2 += dt * du2_dt;
 
             if (U >= ut && du_dt > 0)
             {
                 U = c;
-                u2 += d;
+                U2 += d;
                 Spikes.Add(t);
             }
         }
@@ -56,9 +59,9 @@ namespace SpikingNeuroEvolution
         public double Weight { get; }
         public double E { get; }
 
-        private readonly double tDecay = 40;
+        private readonly double tDecay = 40; // ms
         private readonly double tRise = 3;
-        private readonly double gNMDA = 1.2;
+        private readonly double gNMDA = 1.2; // nS
         private readonly double N = 1.358;
         private readonly double Mg = 1.2;
         private readonly double a = 0.062;
@@ -66,6 +69,7 @@ namespace SpikingNeuroEvolution
 
         public double SpikesTrace(double t)
         {
+            // Spiking Neuron Models: page 53
             var gInf = 1 / (1 + (_target.U < -50 ? 0 : Exp(a * _target.U) * Mg / b));
 
             return gInf * gNMDA * N * _source.Spikes.Sum(ts => SpikeTrace(t, ts));
@@ -73,7 +77,8 @@ namespace SpikingNeuroEvolution
 
         private double SpikeTrace(double t, double ts)
         {
-            return Exp((ts - t) / tDecay) - Exp((ts - t) / tRise);
+            var dt = ts - t;
+            return Exp(dt / tDecay) - Exp(dt / tRise);
         }
 
         public double SynapseInput(double t)
@@ -93,8 +98,8 @@ namespace SpikingNeuroEvolution
     class NeuralNet
     {
         public IReadOnlyList<Neuron> Neurons;
-        
-        private double t;
+
+        public double T { get; private set; }
 
         public NeuralNet()
         {
@@ -110,22 +115,17 @@ namespace SpikingNeuroEvolution
             var n1 = new Neuron();
             var n2 = new Neuron();
             var n3 = new Neuron();
-            var n4 = new Neuron();
-            var n5 = new Neuron();
-            var n6 = new Neuron();
-            var n7 = new Neuron();
-            var n8 = new Neuron();
-            var n9 = new Neuron();
-            Neurons = new List<Neuron> {n1, n3, n4, n5, n6, n7, n8, n9, n2};
+            Neurons = new List<Neuron> {n1, n2, n3};
 
             var d = 0.07;
-            Connect(n1, n2, 1 * 0.01);
-            Connect(n3, n4, 1 * 0.01); // 0.045 -> 0.01
-            Connect(n4, n5, 1 * d);
-            Connect(n5, n6, 1 * d);
-            Connect(n6, n7, 1 * d);
-            Connect(n7, n8, 1 * d);
-            Connect(n8, n9, 1 * d);
+            Connect(n1, n3, 0.01);
+            Connect(n2, n3, 0.02);
+            // Connect(n3, n4, 1 * 0.01); // 0.045 -> 0.01
+            // Connect(n4, n5, 1 * d);
+            // Connect(n5, n6, 1 * d);
+            // Connect(n6, n7, 1 * d);
+            // Connect(n7, n8, 1 * d);
+            // Connect(n8, n9, 1 * d);
             //Connect(n1, n4, 0.01);
             //Connect(n3, n4, 0.01);
             //Connect(n4, n5, 0.01);
@@ -140,16 +140,16 @@ namespace SpikingNeuroEvolution
         public void Update(double dt, IReadOnlyDictionary<Neuron, double> additionalCurrent)
         {
             var inputs = Neurons.ToDictionary(neuron => neuron,
-                neuron => neuron.InputCurrent(t, additionalCurrent.GetValueOrDefault(neuron, 0)));
+                neuron => neuron.InputCurrent(T, additionalCurrent.GetValueOrDefault(neuron, 0)));
 
             foreach (var neuron in Neurons)
             {
                 double inputCurrent = inputs[neuron];
 
-                neuron.Update(t, dt, inputCurrent);
+                neuron.Update(T, dt, inputCurrent);
             }
 
-            t += dt;
+            T += dt;
         }
 
         public void PrintNet(IReadOnlyDictionary<Neuron, double> additionalCurrent)
@@ -157,7 +157,7 @@ namespace SpikingNeuroEvolution
             Console.WriteLine("I");
             foreach (var neuron in Neurons)
             {
-                F(neuron.InputCurrent(t, additionalCurrent[neuron]));
+                F(neuron.InputCurrent(T, additionalCurrent[neuron]));
             }
 
             Console.WriteLine();
@@ -180,6 +180,20 @@ namespace SpikingNeuroEvolution
         public static void F(double d)
         {
             Console.WriteLine(d);
+        }
+
+        public IEnumerable<Synapse> Synapses
+        {
+            get
+            {
+                foreach (var neuron in Neurons)
+                {
+                    foreach (var synapse in neuron.InputSynapses)
+                    {
+                        yield return synapse;
+                    }
+                }
+            }
         }
     }
 
@@ -405,19 +419,57 @@ namespace SpikingNeuroEvolution
             nn.Initialize();
 
             var additionalCurrent = nn.Neurons.ToDictionary(neuron => neuron, neuron => 0.0);
-            additionalCurrent[nn.Neurons[0]] = 19;
-            additionalCurrent[nn.Neurons[1]] = 19;
+            //additionalCurrent[nn.Neurons[1]] = 19;
 
-            while (true)
+            double t = 50;
+            double dt = 0.005;
+            int n = (int)(t / dt);
+
+            var u = new double[nn.Neurons.Count][];
+            var u2 = new double[nn.Neurons.Count][];
+            var ss = new double[nn.Neurons.Count][];
+            for (int k = 0; k < nn.Neurons.Count; k++)
             {
-                for (int i = 0; i < 1000; i++)
+                u[k] = new double[n];
+                u2[k] = new double[n];
+                ss[k] = new double[n];
+            }
+
+            
+            for (int j = 0; j < n; j++)
+            {
+                additionalCurrent[nn.Neurons[0]] = 15;
+                additionalCurrent[nn.Neurons[1]] = 10;
+
+                //}
+                //while (true)
+                //{
+
+                //Console.Clear();
+                //nn.PrintNet(additionalCurrent);
+
+                for (int k = 0; k < nn.Neurons.Count; k++)
                 {
-                    nn.Update(0.01, additionalCurrent);
+                    u[k][j] = nn.Neurons[k].U;
+                    u2[k][j] = nn.Neurons[k].U2;
+                    ss[k][j] = nn.Neurons[k].SynapticStimulation(nn.T);
+                }
+                //Thread.Sleep(10);
+                nn.Update(dt, additionalCurrent);
+            }
+
+            for (int k = 0; k < nn.Neurons.Count; k++)
+            {
+                var plot = new Plot();
+                plot.PlotSignal(u[k], 1 / dt);
+                plot.PlotSignal(u2[k], 1 / dt, lineStyle: LineStyle.Dash);
+                plot.PlotSignal(ss[k], 1 / dt, lineStyle: LineStyle.Dot);
+                foreach (var spike in nn.Neurons[k].Spikes)
+                {
+                    plot.PlotVLine(spike, Color.Red);
                 }
 
-                Console.Clear();
-                nn.PrintNet(additionalCurrent);
-                Thread.Sleep(10);
+                plot.SaveFig($"n{k}.png");
             }
         }
     }
