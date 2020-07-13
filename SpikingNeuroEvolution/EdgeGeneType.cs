@@ -1,14 +1,14 @@
 namespace SpikingNeuroEvolution
 {
-    class EdgeGeneType
+    struct EdgeGeneType
     {
-        public EdgeGeneType(NodeGeneType from, NodeGeneType to)
+        public EdgeGeneType(NodeGene from, NodeGene to)
         {
             From = from;
             To = to;
         }
 
-        public NodeGeneType From { get; }
-        public NodeGeneType To { get; }
+        public NodeGene From { get; }
+        public NodeGene To { get; }
     }
 }

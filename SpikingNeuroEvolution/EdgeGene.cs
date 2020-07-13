@@ -4,11 +4,9 @@ namespace SpikingNeuroEvolution
     {
         public readonly double Weight;
         public readonly bool IsEnabled;
-        public readonly EdgeGeneType GeneType;
 
-        public EdgeGene(EdgeGeneType geneType, double weight, bool isEnabled)
+        public EdgeGene(double weight, bool isEnabled)
         {
-            GeneType = geneType;
             Weight = weight;
             IsEnabled = isEnabled;
         }
@@ -27,13 +25,13 @@ namespace SpikingNeuroEvolution
         {
             return IsEnabled == newIsEnabled
                 ? this
-                : new EdgeGene(GeneType, Weight, newIsEnabled);
+                : new EdgeGene(Weight, newIsEnabled);
         }
 
         public EdgeGene ChangeWeight(double newWeight)
         {
             return Weight != newWeight
-                ? new EdgeGene(GeneType, newWeight, IsEnabled)
+                ? new EdgeGene(newWeight, IsEnabled)
                 : this;
         }
     }

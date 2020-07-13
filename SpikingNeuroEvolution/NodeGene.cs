@@ -2,11 +2,11 @@ namespace SpikingNeuroEvolution
 {
     class NodeGene
     {
-        public readonly NodeGeneType GeneType;
+        public readonly FunctionType FunctionType;
 
-        public NodeGene(NodeGeneType geneType)
+        public NodeGene(FunctionType functionType)
         {
-            GeneType = geneType;
+            FunctionType = functionType;
         }
     }
 }

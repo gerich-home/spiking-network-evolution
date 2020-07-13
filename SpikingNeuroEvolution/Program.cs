@@ -19,28 +19,23 @@ namespace SpikingNeuroEvolution
 
         private static void TestCPPN()
         {
-            var n1 = new NodeGeneType(FunctionType.Identity);
-            var n2 = new NodeGeneType(FunctionType.Identity);
-            var n3 = new NodeGeneType(FunctionType.Sin);
-            var n4 = new NodeGeneType(FunctionType.Identity);
+            var n1 = new NodeGene(FunctionType.Identity);
+            var n2 = new NodeGene(FunctionType.Identity);
+            var n3 = new NodeGene(FunctionType.Sin);
+            var n4 = new NodeGene(FunctionType.Identity);
             var e1 = new EdgeGeneType(n1, n3);
             var e2 = new EdgeGeneType(n2, n3);
             var e3 = new EdgeGeneType(n1, n4);
             var e4 = new EdgeGeneType(n3, n4);
 
+            var b = ImmutableDictionary.CreateBuilder<EdgeGeneType, EdgeGene>();
+            b[e1] = new EdgeGene(1, true); 
+            b[e2] = new EdgeGene(1, true); 
+            b[e3] = new EdgeGene(1, true); 
+            b[e4] = new EdgeGene(1, true); 
             var chromosome = new Chromosome(
-                new Dictionary<NodeGeneType, NodeGene>{
-                    {n1, new NodeGene(n1)},
-                    {n2, new NodeGene(n2)},
-                    {n3, new NodeGene(n3)},
-                    {n4, new NodeGene(n4)},
-                }.ToImmutableDictionary(),
-                new Dictionary<EdgeGeneType, EdgeGene>{
-                    {e1, new EdgeGene(e1, 1, true)},
-                    {e2, new EdgeGene(e2, 1, true)},
-                    {e3, new EdgeGene(e3, 1, true)},
-                    {e4, new EdgeGene(e4, 1, true)},
-                }.ToImmutableDictionary()
+                new[] { n1, n2, n3, n4}.ToImmutableHashSet(),
+                b.ToImmutableDictionary()
             );
 
             var cppn = new CPPN(chromosome, new[]{ n1, n2}, new []{n4});
