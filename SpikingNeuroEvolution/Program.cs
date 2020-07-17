@@ -12,9 +12,10 @@ namespace SpikingNeuroEvolution
     {
         static void Main(string[] args)
         {
-            TestCPPN();
+            //TestCPPN();
             //TestNeat();
             //TestSNN();
+            new GeneticAlgorithm().Test();
         }
 
         private static void TestCPPN()
@@ -49,9 +50,9 @@ namespace SpikingNeuroEvolution
                 (ea, eb) => new EdgeGene((ea.Weight + eb.Weight)/ 2, true)
             );
 
-            var cppn = new CPPN(a, new[]{ n1, n2}, new []{n4});
+            var cppn = new CPPN(a, ImmutableArray.Create(n1, n2), ImmutableArray.Create(n4));
 
-            Console.WriteLine(cppn.Calculate(new[]{1.0, 1.0})[0]);
+            Console.WriteLine(cppn.Calculate(ImmutableArray.Create(1.0, 1.0))[0]);
             // n4 = n3 + n1
             // n3 = Sin(n1 + n2)
             // 

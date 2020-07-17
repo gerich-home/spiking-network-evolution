@@ -12,71 +12,75 @@ namespace SpikingNeuroEvolution
         public readonly ImmutableArray<NodeGene> InputGenes;
         public readonly ImmutableArray<NodeGene> OutputGenes;
 
-        public CPPN(Chromosome chromosome, NodeGene[] inputGenes, NodeGene[] outputGenes)
+        public CPPN(Chromosome chromosome, ImmutableArray<NodeGene> inputGenes, ImmutableArray<NodeGene> outputGenes)
         {
             Chromosome = chromosome;
-            InputGenes = inputGenes.ToImmutableArray();
-            OutputGenes = outputGenes.ToImmutableArray();
+            InputGenes = inputGenes;
+            OutputGenes = outputGenes;
         }
 
-        public double[] Calculate(double[] inputValues)
+        public ImmutableArray<double> Calculate(ImmutableArray<double> inputValues)
         {
-            var edges = Chromosome.EdgeGenes
-                .Where(edgeGene => edgeGene.Value.IsEnabled)
+            var enabledEdges = Chromosome.EdgeGenes
+                            .Where(edgeGene => edgeGene.Value.IsEnabled)
+                            .ToImmutableList();
+            var edgesByFrom = enabledEdges
                 .GroupBy(pair => pair.Key.From)
-                .ToImmutableDictionary(g => g.Key, g => g.Select(pair => new {
-                    pair.Key.To,
-                    pair.Value
-                }).ToImmutableList());
+                .ToImmutableDictionary(g => g.Key, g => g.Select(pair => pair.Key.To).ToImmutableArray());
+
+            var dependenciesCount = Chromosome.NodeGenes
+                .ToDictionary(geneType => geneType, dependenciesCount => 0.0);
+            enabledEdges.Each(edgeGene => dependenciesCount[edgeGene.Key.To]++);
 
             var nodeInput = Chromosome.NodeGenes
                 .ToDictionary(geneType => geneType, _ => 0.0);
-                
+            InputGenes.Each((nodeGene, index) => nodeInput[nodeGene] = inputValues[index]);
+
             var nodeOutput = Chromosome.NodeGenes
                 .ToDictionary(geneType => geneType, _ => 0.0);
 
-            var visitedNodes = new HashSet<NodeGene>();
-            
-            var nodesAddedToQueue = InputGenes.ToHashSet();
-            var nodesQueue = new Queue<NodeGene>(InputGenes);
-            
-            InputGenes.Each((nodeGene, index) => nodeInput[nodeGene] = inputValues[index]);
+            var nodesToVisit = new Queue<NodeGene>(dependenciesCount
+                .Where(pair => pair.Value == 0)
+                .Select(pair => pair.Key));
 
-            while (nodesQueue.Count > 0)
+            var visitedNodes = new HashSet<NodeGene>();
+
+            while (nodesToVisit.Count > 0)
             {
-                var nodeGene = nodesQueue.Dequeue();
+                var nodeGene = nodesToVisit.Dequeue();
+                visitedNodes.Add(nodeGene);
+
                 var value = NodeFunc(nodeGene)(nodeInput[nodeGene]);
                 nodeOutput[nodeGene] = value;
 
-                if (edges.TryGetValue(nodeGene, out var outEdges))
+                if (!edgesByFrom.TryGetValue(nodeGene, out var outEdges))
                 {
-                    foreach(var edge in outEdges)
-                    {
-                        var to = edge.To;
-                        if (visitedNodes.Contains(to)) {
-                            Console.WriteLine("Loop in network!");
-                            continue;
-                            // throw new InvalidOperationException("Loop in network");
-                        }
-
-                        nodeInput[to] += value * edge.Value.Weight;
-                        
-                        if (!nodesAddedToQueue.Contains(to)) {
-                            nodesQueue.Enqueue(to);
-                            nodesAddedToQueue.Add(to);
-                        }
-                    }
+                    continue;
                 }
 
-                visitedNodes.Add(nodeGene);
+                foreach (var to in outEdges)
+                {
+                    nodeInput[to] += value * Chromosome.EdgeGenes[new EdgeGeneType(nodeGene, to)].Weight;
+                    dependenciesCount[to]--;
+
+                    if (dependenciesCount[to] == 0)
+                    {
+                        nodesToVisit.Enqueue(to);
+                    }
+                }
             }
 
-            return OutputGenes.Select(gene => nodeOutput[gene]).ToArray();
+            if (visitedNodes.Count < Chromosome.NodeGenes.Count) {
+                throw new Exception("Loop in CPPN");
+            }
+
+            return OutputGenes.Select(gene => nodeOutput[gene]).ToImmutableArray();
         }
 
         Func<double, double> NodeFunc(NodeGene nodeGene)
         {
-            switch(nodeGene.FunctionType) {
+            switch (nodeGene.FunctionType)
+            {
                 case FunctionType.Identity:
                     return x => x;
                 case FunctionType.Heaviside:
