@@ -4,7 +4,6 @@ namespace SpikingNeuroEvolution
     {
         Sin,
         Identity,
-        Power,
         Heaviside,
         Exponent,
         Log,

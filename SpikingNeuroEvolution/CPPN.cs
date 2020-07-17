@@ -22,6 +22,7 @@ namespace SpikingNeuroEvolution
         public double[] Calculate(double[] inputValues)
         {
             var edges = Chromosome.EdgeGenes
+                .Where(edgeGene => edgeGene.Value.IsEnabled)
                 .GroupBy(pair => pair.Key.From)
                 .ToImmutableDictionary(g => g.Key, g => g.Select(pair => new {
                     pair.Key.To,
@@ -52,11 +53,14 @@ namespace SpikingNeuroEvolution
                     foreach(var edge in outEdges)
                     {
                         var to = edge.To;
-                        nodeInput[to] += value * edge.Value.Weight;
                         if (visitedNodes.Contains(to)) {
-                            throw new InvalidOperationException("Loop in network");
+                            Console.WriteLine("Loop in network!");
+                            continue;
+                            // throw new InvalidOperationException("Loop in network");
                         }
 
+                        nodeInput[to] += value * edge.Value.Weight;
+                        
                         if (!nodesAddedToQueue.Contains(to)) {
                             nodesQueue.Enqueue(to);
                             nodesAddedToQueue.Add(to);

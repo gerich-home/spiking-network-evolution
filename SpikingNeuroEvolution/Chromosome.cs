@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -9,12 +10,45 @@ namespace SpikingNeuroEvolution
     {
         public readonly ImmutableHashSet<NodeGene> NodeGenes;
         public readonly ImmutableDictionary<EdgeGeneType, EdgeGene> EdgeGenes;
+
+        public override string ToString() => $"Chromosome: {{Nodes: [{string.Join(", ", NodeGenes.Select(n => n.InnovationNumber).OrderBy(x => x))}], Edges: []}}";
         
         public Chromosome(ImmutableHashSet<NodeGene> nodeGenes, ImmutableDictionary<EdgeGeneType, EdgeGene> edgeGenes)
         {
             CheckValid(nodeGenes, edgeGenes);
             NodeGenes = nodeGenes;
             EdgeGenes = edgeGenes;
+        }
+
+        public static Chromosome Build(Action<ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder, ImmutableHashSet<NodeGene>.Builder> build) =>
+            BuildInner(
+                ImmutableHashSet.CreateBuilder<NodeGene>(),
+                ImmutableDictionary.CreateBuilder<EdgeGeneType, EdgeGene>(),
+                build
+            );
+
+        public Chromosome Change(Action<ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder, ImmutableHashSet<NodeGene>.Builder> build) =>
+            BuildInner(
+                NodeGenes.ToBuilder(),
+                EdgeGenes.ToBuilder(),
+                build
+            );
+
+        public Chromosome Change(Action<ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder> build) =>
+            BuildInner(
+                NodeGenes.ToBuilder(),
+                EdgeGenes.ToBuilder(),
+                (e, n) => build(e)
+            );
+
+        private static Chromosome BuildInner(ImmutableHashSet<NodeGene>.Builder nodeGenesBuilder, ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder edgeGenesBuilder, Action<ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder, ImmutableHashSet<NodeGene>.Builder> build)
+        {
+            build(edgeGenesBuilder, nodeGenesBuilder);
+
+            return new Chromosome(
+                nodeGenesBuilder.ToImmutable(),
+                edgeGenesBuilder.ToImmutable()
+            );
         }
 
         [Conditional("DEBUG")]
@@ -24,64 +58,69 @@ namespace SpikingNeuroEvolution
             Debug.Assert(edgeGenes.Keys.All(edgeGeneType => nodeGenes.Contains(edgeGeneType.To)));
         }
 
-        // public Chromosome MutateAddNode(EdgeGeneType edgeGeneType)
-        // {
-        //     var gene = EdgeGenes[edgeGeneType];
-        //     var disabledGene = gene.Disable();
-        //     var newNodeGene = new NodeGene(FunctionType.Identity);
-        //     var g1 = new EdgeGene(new EdgeGeneType(disabledGene.GeneType.From, newNodeGene), disabledGene.Weight, true);
-        //     var g2 = new EdgeGene(new EdgeGeneType(newNodeGene, disabledGene.GeneType.To), disabledGene.Weight, true);
+        public Chromosome MutateAddNode(Func<int, int> chooseEdgeGeneTypeIndex, FunctionType functionType, double fromWeight, double toWeight) =>
+            Change((e, n) => {
+                var newNodeGene = new NodeGene(functionType);
+                n.Add(newNodeGene);
+                var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
+                var edgeGene = EdgeGenes[edgeGeneType];
+                e[edgeGeneType] = edgeGene.Disable();
+                e[new EdgeGeneType(edgeGeneType.From, newNodeGene)] = new EdgeGene(fromWeight, true);
+                e[new EdgeGeneType(newNodeGene, edgeGeneType.To)] = new EdgeGene(toWeight, true);
+            });
 
-        //     var newEdgeGenes = EdgeGenes.Remove(edgeGeneType).Add(g1);
+        public Chromosome MutateAddEdge(Func<int, int> chooseEdgeGeneTypeIndex, double weight) =>
+            Change((e, n) => {
+                var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
+                var edgeGene = EdgeGenes[edgeGeneType];
+                var missingEdges = NodeGenes
+                    .SelectMany(fromGene => NodeGenes.Where(toGene => toGene != fromGene).Select(toGene => new EdgeGeneType(fromGene, toGene)))
+                    .ToImmutableHashSet()
+                    .Except(EdgeGenes.Keys);
+                
+                if (missingEdges.Count == 0) {
+                    return;
+                }
 
-        //     return new Chromosome(newEdgeGenes, Nodes + 1);
-        // }
+                e[missingEdges.ElementAt(chooseEdgeGeneTypeIndex(missingEdges.Count))] = new EdgeGene(weight, true);
+            });
 
-        // public Chromosome MutateChangeWeight(Func<ImmutableHashSet<EdgeGene>, (EdgeGene, double)> chooseGeneAndWeight)
-        // {
-        //     var (gene, newWeight) = chooseGeneAndWeight(EdgeGenes);
+        public Chromosome MutateChangeWeight(Func<int, int> chooseEdgeGeneTypeIndex, double weightChange) =>
+            Change(e => {
+                var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
+                var edgeGene = EdgeGenes[edgeGeneType];
+                e[edgeGeneType] = edgeGene.ChangeWeight(edgeGene.Weight + weightChange);
+            });
 
-        //     var newEdgeGenes = EdgeGenes
-        //         .Remove(gene)
-        //         .Add(gene.ChangeWeight(newWeight));
+        public Chromosome MutateChangeEnabled(Func<int, int> chooseEdgeGeneTypeIndex) =>
+            Change(e => {
+                var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
+                var edgeGene = EdgeGenes[edgeGeneType];
+                e[edgeGeneType] = edgeGene.ToggleEnabled();
+            });
 
-        //     return new Chromosome(newEdgeGenes, Nodes);
-        // }
+        public static Chromosome Crossover(Chromosome chromosomeA, Chromosome chromosomeB,
+            Func<EdgeGene, EdgeGene, EdgeGene> crossoverMatchingGene)
+        {
+            return Build((e, n) => {
+                n.UnionWith(chromosomeA.NodeGenes);
+                n.UnionWith(chromosomeB.NodeGenes);
 
-        // public Chromosome MutateChangeEnabled(Func<ImmutableHashSet<EdgeGene>, (EdgeGene, bool)> chooseGeneAndEnabled)
-        // {
-        //     var (gene, newIsEnabled) = chooseGeneAndEnabled(EdgeGenes);
+                var edgeGenesA = chromosomeA.EdgeGenes;
+                var edgeGenesB = chromosomeB.EdgeGenes;
 
-        //     var newEdgeGenes = EdgeGenes
-        //         .Remove(gene)
-        //         .Add(gene.ChangeEnabled(newIsEnabled));
-
-        //     return new Chromosome(newEdgeGenes, Nodes);
-        // }
-
-        // public static Chromosome Crossover(Chromosome chromosomeA, Chromosome chromosomeB,
-        //     Func<EdgeGene, EdgeGene, EdgeGene> crossoverMatchingGene)
-        // {
-        //     var edgeGenesA = EdgeGenes(chromosomeA);
-        //     var edgeGenesB = EdgeGenes(chromosomeB);
-
-        //     var keysA = edgeGenesA.Keys.ToImmutableHashSet();
-        //     var keysB = edgeGenesB.Keys.ToImmutableHashSet();
-
-        //     var disjointGenesA = keysA.Except(keysB).Select(key => edgeGenesA[key]);
-        //     var disjointGenesB = keysB.Except(keysA).Select(key => edgeGenesB[key]);
-        //     var crossedGenes = keysA.Intersect(keysB)
-        //         .Select(key => crossoverMatchingGene(edgeGenesA[key], edgeGenesB[key]));
-
-        //     return new Chromosome(disjointGenesA
-        //             .Concat(disjointGenesB)
-        //             .Concat(crossedGenes),
-        //         Max(chromosomeA.Nodes, chromosomeB.Nodes));
-
-        //     ImmutableDictionary<GeneType, EdgeGene> EdgeGenes(Chromosome chromosome)
-        //     {
-        //         return chromosome.EdgeGenes.ToImmutableDictionary(gene => gene.GeneType, gene => gene);
-        //     }
-        // }
+                var intersection = edgeGenesA.Keys.Intersect(edgeGenesB.Keys);
+                
+                e.AddRange(edgeGenesA.RemoveRange(intersection));
+                e.AddRange(edgeGenesB.RemoveRange(intersection));
+                
+                e.AddRange(intersection
+                    .Select(matchingEdgeGeneType => KeyValuePair.Create(
+                        matchingEdgeGeneType,
+                        crossoverMatchingGene(edgeGenesA[matchingEdgeGeneType], edgeGenesB[matchingEdgeGeneType])
+                    ))
+                );
+            });
+        }
     }
 }

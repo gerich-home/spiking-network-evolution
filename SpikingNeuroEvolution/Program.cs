@@ -23,22 +23,33 @@ namespace SpikingNeuroEvolution
             var n2 = new NodeGene(FunctionType.Identity);
             var n3 = new NodeGene(FunctionType.Sin);
             var n4 = new NodeGene(FunctionType.Identity);
-            var e1 = new EdgeGeneType(n1, n3);
-            var e2 = new EdgeGeneType(n2, n3);
-            var e3 = new EdgeGeneType(n1, n4);
-            var e4 = new EdgeGeneType(n3, n4);
 
-            var b = ImmutableDictionary.CreateBuilder<EdgeGeneType, EdgeGene>();
-            b[e1] = new EdgeGene(1, true); 
-            b[e2] = new EdgeGene(1, true); 
-            b[e3] = new EdgeGene(1, true); 
-            b[e4] = new EdgeGene(1, true); 
-            var chromosome = new Chromosome(
-                new[] { n1, n2, n3, n4}.ToImmutableHashSet(),
-                b.ToImmutableDictionary()
+            var chromosome = Chromosome.Build((e, n) => {
+                n.Add(n1);
+                n.Add(n2);
+                n.Add(n3);
+                n.Add(n4);
+                e.Add(new EdgeGeneType(n1, n3), new EdgeGene(1, true));
+                e.Add(new EdgeGeneType(n2, n3), new EdgeGene(1, true));
+                e.Add(new EdgeGeneType(n1, n4), new EdgeGene(1, true));
+                e.Add(new EdgeGeneType(n3, n4), new EdgeGene(1, true));
+            });
+
+            var a = chromosome
+                .MutateAddNode(n => n / 2, FunctionType.Log, 1, 1)
+                .MutateAddNode(n => n / 3, FunctionType.Log, 1, 1)
+                .MutateChangeEnabled(n => n / 4)
+                .MutateChangeWeight(n => n / 3, 1);
+
+            var b = chromosome
+                .MutateAddNode(n => n / 2, FunctionType.Exponent, 1, 1)
+                .MutateAddNode(n => n / 2, FunctionType.Heaviside, 1, 1);
+            
+            var c = Chromosome.Crossover(a, b,
+                (ea, eb) => new EdgeGene((ea.Weight + eb.Weight)/ 2, true)
             );
 
-            var cppn = new CPPN(chromosome, new[]{ n1, n2}, new []{n4});
+            var cppn = new CPPN(a, new[]{ n1, n2}, new []{n4});
 
             Console.WriteLine(cppn.Calculate(new[]{1.0, 1.0})[0]);
             // n4 = n3 + n1
