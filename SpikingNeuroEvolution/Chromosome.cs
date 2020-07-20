@@ -58,9 +58,9 @@ namespace SpikingNeuroEvolution
             Debug.Assert(edgeGenes.Keys.All(edgeGeneType => nodeGenes.Contains(edgeGeneType.To)));
         }
 
-        public Chromosome MutateAddNode(Func<int, int> chooseEdgeGeneTypeIndex, FunctionType functionType, double fromWeight, double toWeight) =>
+        public Chromosome MutateAddNode(Func<int, int> chooseEdgeGeneTypeIndex, FunctionType functionType, AggregationType aggregationType, double fromWeight, double toWeight) =>
             Change((e, n) => {
-                var newNodeGene = new NodeGene(functionType);
+                var newNodeGene = new NodeGene(functionType, aggregationType);
                 n.Add(newNodeGene);
                 var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
                 var edgeGene = EdgeGenes[edgeGeneType];
@@ -76,7 +76,8 @@ namespace SpikingNeuroEvolution
                 var missingEdges = NodeGenes
                     .SelectMany(fromGene => NodeGenes.Where(toGene => toGene != fromGene).Select(toGene => new EdgeGeneType(fromGene, toGene)))
                     .ToImmutableHashSet()
-                    .Except(EdgeGenes.Keys);
+                    .Except(EdgeGenes.Keys)
+                    .Except(EdgeGenes.Keys.Select(key => new EdgeGeneType(key.To, key.From)));
                 
                 if (missingEdges.Count == 0) {
                     return;
