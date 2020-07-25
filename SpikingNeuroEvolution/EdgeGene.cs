@@ -7,6 +7,8 @@ namespace SpikingNeuroEvolution
 
         public override string ToString() => $"{Weight}{(IsEnabled ? "" : "(off)")}";
 
+        public double ActualWeight => IsEnabled ? Weight : 0;
+
         public EdgeGene(double weight, bool isEnabled)
         {
             Weight = weight;
