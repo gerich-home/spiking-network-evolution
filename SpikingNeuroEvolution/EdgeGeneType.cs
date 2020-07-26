@@ -2,7 +2,7 @@ namespace SpikingNeuroEvolution
 {
     struct EdgeGeneType
     {
-        public override string ToString() => $"Edge[{From.InnovationNumber}->{To.InnovationNumber}]";
+        public override string ToString() => $"Edge[{From.InnovationId}->{To.InnovationId}]";
         public EdgeGeneType(NodeGene from, NodeGene to)
         {
             From = from;

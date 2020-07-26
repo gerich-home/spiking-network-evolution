@@ -127,6 +127,8 @@ namespace SpikingNeuroEvolution
                     return x => x;
                 case FunctionType.Heaviside:
                     return x => x > 0 ? 1 : 0;
+                case FunctionType.Sigmoid:
+                    return x => 1 / (1 + Exp(-4.9 * x));
                 case FunctionType.Sin:
                     return Sin;
                 case FunctionType.Exponent:

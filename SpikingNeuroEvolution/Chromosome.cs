@@ -11,7 +11,7 @@ namespace SpikingNeuroEvolution
         public readonly ImmutableHashSet<NodeGene> NodeGenes;
         public readonly ImmutableDictionary<EdgeGeneType, EdgeGene> EdgeGenes;
 
-        public override string ToString() => $"Chromosome: {{Nodes: [{string.Join(", ", NodeGenes.Select(n => n.InnovationNumber).OrderBy(x => x))}], Edges: []}}";
+        public override string ToString() => $"Chromosome: {{Nodes: [{string.Join(", ", NodeGenes.Select(n => n.InnovationId).OrderBy(x => x))}], Edges: []}}";
         
         public Chromosome(ImmutableHashSet<NodeGene> nodeGenes, ImmutableDictionary<EdgeGeneType, EdgeGene> edgeGenes)
         {
@@ -72,11 +72,15 @@ namespace SpikingNeuroEvolution
             double toWeight
         ) =>
             Change((e, n) => {
-                var newNodeGene = new NodeGene(functionType, aggregationType, NodeType.Inner);
-                n.Add(newNodeGene);
+                if (EdgeGenes.Count == 0) {
+                    return;
+                }
+
                 var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
                 var edgeGene = EdgeGenes[edgeGeneType];
                 e[edgeGeneType] = edgeGene.Disable();
+                var newNodeGene = new NodeGene(NodeGene.InnovationIdByParents(edgeGeneType.From, edgeGeneType.To), functionType, aggregationType, NodeType.Inner);
+                n.Add(newNodeGene);
                 e[new EdgeGeneType(edgeGeneType.From, newNodeGene)] = new EdgeGene(fromWeight, true);
                 e[new EdgeGeneType(newNodeGene, edgeGeneType.To)] = new EdgeGene(toWeight, true);
             });
@@ -89,7 +93,7 @@ namespace SpikingNeuroEvolution
                 var missingEdges = NodeGenes
                     .Where(fromGene => fromGene.NodeType != NodeType.Output)
                     .SelectMany(fromGene => NodeGenes
-                        .Where(toGene => toGene != fromGene && toGene.NodeType != NodeType.Input)
+                        .Where(toGene => !toGene.Equals(fromGene) && toGene.NodeType != NodeType.Input)
                         .Select(toGene => new EdgeGeneType(fromGene, toGene)))
                     .ToImmutableHashSet()
                     .Except(EdgeGenes.Keys)

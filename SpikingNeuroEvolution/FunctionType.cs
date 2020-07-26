@@ -7,5 +7,6 @@ namespace SpikingNeuroEvolution
         Heaviside,
         Exponent,
         Log,
+        Sigmoid,
     }
 }

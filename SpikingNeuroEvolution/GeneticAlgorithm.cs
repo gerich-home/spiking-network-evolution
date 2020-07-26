@@ -9,7 +9,7 @@ namespace SpikingNeuroEvolution
     {
         public void Test()
         {
-            var (seedChromosome, inputGenes, outputGenes) = CreateSeedChromosome(2, 1);
+            var (seedChromosome, inputGenes, outputGenes) = CreateSeedChromosome(3, 1);
 
             var rnd = new Random();
 
@@ -17,19 +17,29 @@ namespace SpikingNeuroEvolution
             const int mutants = 10;
             const int children = 5;
             var population = EvaluatePopulation(CreateInitialPopulation(seedChromosome, populationSize)).ToImmutableList();
-            
-            var goldEvaluator = CreateChromosomeEvaluator(new (double, double)[]{
+
+            var goldExamples = new (double, double)[]{
                 (1, 2),
                 (10, -2),
+                (-10, -2),
+                (10, 2),
+                (-10, 2),
                 (2, 2),
                 (0.5, 4),
                 (100, 20),
-            }.ToImmutableList());
+            }.ToImmutableList();
+            var goldEvaluator = CreateChromosomeEvaluator(goldExamples);
             EvaluatedChromosome best;
             for (int i = 0; true; i++) {
                 best = EvaluateWithEvaluator(SelectChromosomes(population), goldEvaluator)
                     .OrderByDescending(e => e.Fitness).First();
                 Console.WriteLine(Math.Exp(-best.Fitness));
+
+                foreach(var example in goldExamples)
+                {
+                    var (x, y) = example;
+                    Console.WriteLine($"f({x}, {y}) -> {EvaluatePhenotype(best.Chromosome, example)}");
+                }
                 
                 population = NextPopulation(population);
             }
@@ -38,7 +48,7 @@ namespace SpikingNeuroEvolution
             {
                 for (int j = 0; j < 5; j++)
                 {
-                    Console.WriteLine($"f({i}, {j}) -> {EvaluatePhenotype(best.Chromosome, i, j)} ({TargetFunction(i, j)})");
+                    Console.WriteLine($"f({i}, {j}) -> {EvaluatePhenotype(best.Chromosome, (i, j))} ({TargetFunction(i, j)})");
                 }
             }
 
@@ -64,7 +74,7 @@ namespace SpikingNeuroEvolution
                     double sum = 0;
 
                     foreach(var (a, b) in examples) {
-                        var result = cppn.Calculate(ImmutableArray.Create(a, b))[0];
+                        var result = cppn.Calculate(ImmutableArray.Create(1, a, b))[0];
                         if (double.IsNaN(result)) {
                             return double.NaN;
                         } else if(double.IsInfinity(result)) {
@@ -88,16 +98,17 @@ namespace SpikingNeuroEvolution
                 }
             }
 
-            double EvaluatePhenotype(Chromosome chromosome, double x, double y)
+            double EvaluatePhenotype(Chromosome chromosome, (double, double) example)
             {
                 var cppn = new CPPN(chromosome, inputGenes, outputGenes);
+                var (x, y) = example;
 
-                return cppn.Calculate(ImmutableArray.Create(x, y))[0];
+                return cppn.Calculate(ImmutableArray.Create(1, x, y))[0];
             }
 
             double TargetFunction(double x, double y)
             {
-                return x * y;
+                return x * y; //(x > 0) ^ (y > 0) ? 1.0 : 0.0;
             }
 
             ImmutableList<EvaluatedChromosome> NextPopulation(ImmutableList<EvaluatedChromosome> evaluatedPopulation)
@@ -189,12 +200,12 @@ namespace SpikingNeuroEvolution
             {
                 var choice = rnd.NextDouble();
 
-                if (choice < 0.000)
+                if (choice < 0.1)
                 {
                     return chromosome.MutateAddNode(rnd.Next, ChooseNodeType(), ChooseAggregationType(), rnd.NextDouble() * 2 - 1, rnd.NextDouble() * 2 - 1);
                 }
 
-                if (choice < 0.1)
+                if (choice < 0.2)
                 {
                     return chromosome.MutateAddEdge(rnd.Next, rnd.NextDouble() * 2 - 1);
                 }
@@ -229,6 +240,11 @@ namespace SpikingNeuroEvolution
                 if (choice < 0.2)
                 {
                     return FunctionType.Heaviside;
+                }
+
+                if (choice < 0.25)
+                {
+                    return FunctionType.Sigmoid;
                 }
 
                 return FunctionType.Identity;
@@ -289,7 +305,7 @@ namespace SpikingNeuroEvolution
         private static ImmutableArray<NodeGene> CreateNodeGenes(int count, NodeType nodePurpose)
         {
             return Enumerable.Range(0, count)
-                .Select(i => new NodeGene(FunctionType.Identity, AggregationType.Sum, nodePurpose))
+                .Select(i => new NodeGene(NodeGene.RandomInnovationId(), FunctionType.Identity, AggregationType.Sum, nodePurpose))
                 .ToImmutableArray();
         }
     }
