@@ -29,7 +29,7 @@ namespace SpikingNeuroEvolution
             for (int i = 0; true; i++) {
                 best = EvaluateWithEvaluator(SelectChromosomes(population), goldEvaluator)
                     .OrderByDescending(e => e.Fitness).First();
-                Console.WriteLine(best.Fitness);
+                Console.WriteLine(Math.Exp(-best.Fitness));
                 
                 population = NextPopulation(population);
             }
@@ -61,18 +61,26 @@ namespace SpikingNeuroEvolution
                 {
                     var cppn = new CPPN(chromosome, inputGenes, outputGenes);
 
-                    double fitness = 0;
+                    double sum = 0;
 
                     foreach(var (a, b) in examples) {
                         var result = cppn.Calculate(ImmutableArray.Create(a, b))[0];
                         if (double.IsNaN(result)) {
                             return double.NaN;
+                        } else if(double.IsInfinity(result)) {
+                            return double.NegativeInfinity;
                         } else {
-                            fitness += Math.Pow(result - TargetFunction(a, b), 2);
+                            sum += Math.Pow(result - TargetFunction(a, b), 2);
                         }
                     }
 
-                    return fitness == 0 ? double.PositiveInfinity : 20 + Math.Log(1 / fitness);
+                    if (sum == 0) {
+                        return double.PositiveInfinity;
+                    }
+
+                    var d = Math.Sqrt(sum / examples.Count);
+
+                    return -Math.Log(d);
                 }
                 catch
                 {
@@ -89,7 +97,7 @@ namespace SpikingNeuroEvolution
 
             double TargetFunction(double x, double y)
             {
-                return 2 * (x + y);
+                return x * y;
             }
 
             ImmutableList<EvaluatedChromosome> NextPopulation(ImmutableList<EvaluatedChromosome> evaluatedPopulation)
@@ -266,24 +274,22 @@ namespace SpikingNeuroEvolution
 
         private static (Chromosome, ImmutableArray<NodeGene>, ImmutableArray<NodeGene>) CreateSeedChromosome(int inputGenesCount, int outputGenesCount)
         {
-            var inputGenes = CreateNodeGenes(inputGenesCount);
-            var outputGenes = CreateNodeGenes(outputGenesCount);
+            var inputGenes = CreateNodeGenes(inputGenesCount, NodeType.Input);
+            var outputGenes = CreateNodeGenes(outputGenesCount, NodeType.Output);
 
             var seedChromosome = Chromosome.Build((e, n) =>
             {
                 n.UnionWith(inputGenes);
                 n.UnionWith(outputGenes);
-                inputGenes.SelectMany(i => outputGenes.Select(o => new EdgeGeneType(i, o)))
-                    .Each(edgeGeneType => e[edgeGeneType] = new EdgeGene(1.0, true));
             });
 
             return (seedChromosome, inputGenes, outputGenes);
         }
 
-        private static ImmutableArray<NodeGene> CreateNodeGenes(int count)
+        private static ImmutableArray<NodeGene> CreateNodeGenes(int count, NodeType nodePurpose)
         {
             return Enumerable.Range(0, count)
-                .Select(i => new NodeGene(FunctionType.Identity, AggregationType.Sum))
+                .Select(i => new NodeGene(FunctionType.Identity, AggregationType.Sum, nodePurpose))
                 .ToImmutableArray();
         }
     }

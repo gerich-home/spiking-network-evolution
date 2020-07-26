@@ -72,7 +72,7 @@ namespace SpikingNeuroEvolution
             double toWeight
         ) =>
             Change((e, n) => {
-                var newNodeGene = new NodeGene(functionType, aggregationType);
+                var newNodeGene = new NodeGene(functionType, aggregationType, NodeType.Inner);
                 n.Add(newNodeGene);
                 var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
                 var edgeGene = EdgeGenes[edgeGeneType];
@@ -86,10 +86,11 @@ namespace SpikingNeuroEvolution
             double weight
         ) =>
             Change((e, n) => {
-                var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
-                var edgeGene = EdgeGenes[edgeGeneType];
                 var missingEdges = NodeGenes
-                    .SelectMany(fromGene => NodeGenes.Where(toGene => toGene != fromGene).Select(toGene => new EdgeGeneType(fromGene, toGene)))
+                    .Where(fromGene => fromGene.NodeType != NodeType.Output)
+                    .SelectMany(fromGene => NodeGenes
+                        .Where(toGene => toGene != fromGene && toGene.NodeType != NodeType.Input)
+                        .Select(toGene => new EdgeGeneType(fromGene, toGene)))
                     .ToImmutableHashSet()
                     .Except(EdgeGenes.Keys)
                     .Except(EdgeGenes.Keys.Select(key => new EdgeGeneType(key.To, key.From)));
@@ -106,6 +107,10 @@ namespace SpikingNeuroEvolution
             double weightChange
         ) =>
             Change(e => {
+                if (EdgeGenes.Count == 0) {
+                    return;
+                }
+
                 var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
                 var edgeGene = EdgeGenes[edgeGeneType];
                 e[edgeGeneType] = edgeGene.ChangeWeight(edgeGene.Weight + weightChange);
@@ -115,6 +120,10 @@ namespace SpikingNeuroEvolution
             Func<int, int> chooseEdgeGeneTypeIndex
         ) =>
             Change(e => {
+                if (EdgeGenes.Count == 0) {
+                    return;
+                }
+
                 var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
                 var edgeGene = EdgeGenes[edgeGeneType];
                 e[edgeGeneType] = edgeGene.ToggleEnabled();

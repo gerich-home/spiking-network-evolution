@@ -17,6 +17,15 @@ namespace SpikingNeuroEvolution
             Chromosome = chromosome;
             InputGenes = inputGenes;
             OutputGenes = outputGenes;
+
+            if (inputGenes.Any(gene => gene.NodeType != NodeType.Input))
+            {
+                throw new ArgumentException("Non-input gene passed");
+            }
+            if (outputGenes.Any(gene => gene.NodeType != NodeType.Output))
+            {
+                throw new ArgumentException("Non-output gene passed");
+            }
         }
 
         public ImmutableArray<double> Calculate(ImmutableArray<double> inputValues)

@@ -20,10 +20,10 @@ namespace SpikingNeuroEvolution
 
         private static void TestCPPN()
         {
-            var n1 = new NodeGene(FunctionType.Identity, AggregationType.Sum);
-            var n2 = new NodeGene(FunctionType.Identity, AggregationType.Sum);
-            var n3 = new NodeGene(FunctionType.Sin, AggregationType.Sum);
-            var n4 = new NodeGene(FunctionType.Identity, AggregationType.Sum);
+            var n1 = new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Input);
+            var n2 = new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Input);
+            var n3 = new NodeGene(FunctionType.Sin, AggregationType.Sum, NodeType.Inner);
+            var n4 = new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Output);
 
             var chromosome = Chromosome.Build((e, n) => {
                 n.Add(n1);
