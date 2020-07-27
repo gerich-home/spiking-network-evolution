@@ -33,7 +33,7 @@ namespace SpikingNeuroEvolution
             for (int i = 0; true; i++) {
                 best = EvaluateWithEvaluator(SelectChromosomes(population), goldEvaluator)
                     .OrderByDescending(e => e.Fitness).First();
-                Console.WriteLine(Math.Exp(-best.Fitness));
+                Console.WriteLine(1 / best.Fitness);
 
                 foreach(var example in goldExamples)
                 {
@@ -71,7 +71,7 @@ namespace SpikingNeuroEvolution
                 {
                     var cppn = new CPPN(chromosome, inputGenes, outputGenes);
 
-                    double sum = 0;
+                    double worst = 0;
 
                     foreach(var (a, b) in examples) {
                         var result = cppn.Calculate(ImmutableArray.Create(1, a, b))[0];
@@ -80,17 +80,15 @@ namespace SpikingNeuroEvolution
                         } else if(double.IsInfinity(result)) {
                             return double.NegativeInfinity;
                         } else {
-                            sum += Math.Pow(result - TargetFunction(a, b), 2);
+                            worst = Math.Max(worst, Math.Abs(result - TargetFunction(a, b)));
                         }
                     }
 
-                    if (sum == 0) {
+                    if (worst == 0) {
                         return double.PositiveInfinity;
                     }
 
-                    var d = Math.Sqrt(sum / examples.Count);
-
-                    return -Math.Log(d);
+                    return 1 / worst;
                 }
                 catch
                 {
@@ -108,7 +106,7 @@ namespace SpikingNeuroEvolution
 
             double TargetFunction(double x, double y)
             {
-                return x * y; //(x > 0) ^ (y > 0) ? 1.0 : 0.0;
+                return x * y;
             }
 
             ImmutableList<EvaluatedChromosome> NextPopulation(ImmutableList<EvaluatedChromosome> evaluatedPopulation)
