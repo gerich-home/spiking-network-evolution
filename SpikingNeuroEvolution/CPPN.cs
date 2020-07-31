@@ -9,20 +9,20 @@ namespace SpikingNeuroEvolution
     class CPPN
     {
         public readonly Chromosome Chromosome;
-        public readonly ImmutableArray<NodeGene> InputGenes;
-        public readonly ImmutableArray<NodeGene> OutputGenes;
+        public readonly ImmutableArray<NodeGeneType> InputGenes;
+        public readonly ImmutableArray<NodeGeneType> OutputGenes;
 
-        public CPPN(Chromosome chromosome, ImmutableArray<NodeGene> inputGenes, ImmutableArray<NodeGene> outputGenes)
+        public CPPN(Chromosome chromosome, ImmutableArray<NodeGeneType> inputGenes, ImmutableArray<NodeGeneType> outputGenes)
         {
             Chromosome = chromosome;
             InputGenes = inputGenes;
             OutputGenes = outputGenes;
 
-            if (inputGenes.Any(gene => gene.NodeType != NodeType.Input))
+            if (inputGenes.Any(gene => chromosome.NodeGenes[gene].NodeType != NodeType.Input))
             {
                 throw new ArgumentException("Non-input gene passed");
             }
-            if (outputGenes.Any(gene => gene.NodeType != NodeType.Output))
+            if (outputGenes.Any(gene => chromosome.NodeGenes[gene].NodeType != NodeType.Output))
             {
                 throw new ArgumentException("Non-output gene passed");
             }
@@ -32,7 +32,7 @@ namespace SpikingNeuroEvolution
         {
             var enabledEdges = Chromosome.EdgeGenes
                             .Where(edgeGene => edgeGene.Value.IsEnabled)
-                            .ToImmutableList();
+                            .ToImmutableArray();
             var edgesByFrom = enabledEdges
                 .GroupBy(pair => pair.Key.From)
                 .ToImmutableDictionary(g => g.Key, g => g.Select(pair => pair.Key.To).ToImmutableArray());
@@ -41,7 +41,7 @@ namespace SpikingNeuroEvolution
                 .GroupBy(pair => pair.Key.To)
                 .ToImmutableDictionary(g => g.Key, g => g.Select(pair => pair.Key.From).ToImmutableArray());
 
-            var dependenciesCount = Chromosome.NodeGenes
+            var dependenciesCount = Chromosome.NodeGenes.Keys
                 .ToDictionary(geneType => geneType, dependenciesCount => 0.0);
             enabledEdges.Each(edgeGene => dependenciesCount[edgeGene.Key.To]++);
 
@@ -49,31 +49,38 @@ namespace SpikingNeuroEvolution
                 .Zip(inputValues)
                 .ToImmutableDictionary(pair => pair.First, pair => pair.Second);
 
-            var nodeOutput = Chromosome.NodeGenes
+            var nodeOutput = Chromosome.NodeGenes.Keys
                 .ToDictionary(geneType => geneType, _ => 0.0);
 
-            var nodesToVisit = new Queue<NodeGene>(dependenciesCount
+            var nodesToVisit = new Queue<NodeGeneType>(dependenciesCount
                 .Where(pair => pair.Value == 0)
                 .Select(pair => pair.Key));
 
-            var visitedNodes = new HashSet<NodeGene>();
+            var visitedNodes = new HashSet<NodeGeneType>();
 
             while (nodesToVisit.Count > 0)
             {
-                var nodeGene = nodesToVisit.Dequeue();
-                visitedNodes.Add(nodeGene);
+                var nodeGeneType = nodesToVisit.Dequeue();
+                var nodeGene = Chromosome.NodeGenes[nodeGeneType];
+                visitedNodes.Add(nodeGeneType);
 
-                double input = 0;
-                nodeInput.TryGetValue(nodeGene, out input);
+                double input = nodeInput.TryGetValue(nodeGeneType, out var externalInput) ?
+                    externalInput :
+                    0.0;
                 
-                if (edgesByTo.TryGetValue(nodeGene, out var inEdges))
-                {
-                    input += Aggregate(nodeGene.AggregationType, inEdges.Select(fromNode => nodeOutput[fromNode] * Chromosome.EdgeGenes[new EdgeGeneType(fromNode, nodeGene)].Weight));
-                }
+                double incomingTotal = edgesByTo.TryGetValue(nodeGeneType, out var inEdges) ?
+                    Aggregate(
+                        nodeGene.AggregationType,
+                        inEdges.Select(
+                            fromNode => nodeOutput[fromNode] *
+                                Chromosome.EdgeGenes[new EdgeGeneType(fromNode, nodeGeneType)].Weight
+                            )
+                        ) :
+                    0.0;
 
-                nodeOutput[nodeGene] = NodeFunc(nodeGene)(input);
+                nodeOutput[nodeGeneType] = NodeFunc(Chromosome.NodeGenes[nodeGeneType])(input + incomingTotal);
 
-                if (!edgesByFrom.TryGetValue(nodeGene, out var outEdges))
+                if (!edgesByFrom.TryGetValue(nodeGeneType, out var outEdges))
                 {
                     continue;
                 }
@@ -105,7 +112,7 @@ namespace SpikingNeuroEvolution
                 case AggregationType.Avg:
                     return inputs.Average();
                 case AggregationType.Multiply:
-                    return inputs.Aggregate((x, y) => x * y);
+                    return inputs.Aggregate(1.0, (x, y) => x * y);
                 case AggregationType.Max:
                     return inputs.Max();
                 case AggregationType.Min:

@@ -16,7 +16,7 @@ namespace SpikingNeuroEvolution
             const int populationSize = 30;
             const int mutants = 10;
             const int children = 5;
-            var population = EvaluatePopulation(CreateInitialPopulation(seedChromosome, populationSize)).ToImmutableList();
+            var population = EvaluatePopulation(CreateInitialPopulation(seedChromosome, populationSize)).ToImmutableArray();
 
             var goldExamples = new (double, double)[]{
                 (1, 2),
@@ -27,13 +27,13 @@ namespace SpikingNeuroEvolution
                 (2, 2),
                 (0.5, 4),
                 (100, 20),
-            }.ToImmutableList();
+            }.ToImmutableArray();
             var goldEvaluator = CreateChromosomeEvaluator(goldExamples);
             EvaluatedChromosome best;
             for (int i = 0; true; i++) {
                 best = EvaluateWithEvaluator(SelectChromosomes(population), goldEvaluator)
                     .OrderByDescending(e => e.Fitness).First();
-                Console.WriteLine(1 / best.Fitness);
+                Console.WriteLine($"nodes={best.Chromosome.NodeGenes.Count - (inputGenes.Length + outputGenes.Length)} edges={best.Chromosome.EdgeGenes.Count(e => e.Value.IsEnabled)} -> fitness: {1 / best.Fitness}");
 
                 foreach(var example in goldExamples)
                 {
@@ -58,14 +58,14 @@ namespace SpikingNeuroEvolution
                 CreateChromosomeEvaluator(
                     Enumerable.Range(0, 20)
                         .Select(i => (rnd.NextDouble() * 100 - 50, rnd.NextDouble() * 100 - 50))
-                        .ToImmutableList()
+                        .ToImmutableArray()
                     );
 
             Func<Chromosome, double> CreateChromosomeEvaluator(
-                ImmutableList<(double, double)> examples
+                ImmutableArray<(double, double)> examples
             ) => chromose => EvaluateChromosome(chromose, examples);
 
-            double EvaluateChromosome(Chromosome chromosome, ImmutableList<(double, double)> examples)
+            double EvaluateChromosome(Chromosome chromosome, IEnumerable<(double, double)> examples)
             {
                 try
                 {
@@ -109,20 +109,20 @@ namespace SpikingNeuroEvolution
                 return x * y;
             }
 
-            ImmutableList<EvaluatedChromosome> NextPopulation(ImmutableList<EvaluatedChromosome> evaluatedPopulation)
+            ImmutableArray<EvaluatedChromosome> NextPopulation(ImmutableArray<EvaluatedChromosome> evaluatedPopulation)
             {
-                var orederValidPopulation = evaluatedPopulation
+                var orderedValidPopulation = evaluatedPopulation
                     .Where(ec => !double.IsNaN(ec.Fitness))
                     .OrderByDescending(ec => ec.Fitness)
-                    .ToImmutableList();
+                    .ToImmutableArray();
 
-                var best = orederValidPopulation.First();
+                var best = orderedValidPopulation.First();
                 
                 return EvaluatePopulation(new []{best.Chromosome}
-                    .Concat(SelectChromosomes(EvaluateBySpecies(orederValidPopulation.Skip(1)).OrderByDescending(ec => ec.Fitness).Take(populationSize - (mutants + children))))
-                    .Concat(SelectChromosomes(GetRandomOrderPopulation(orederValidPopulation).Take(mutants)).Select(Mutate))
-                    .Concat(GetRandomOrderPopulation(orederValidPopulation).Take(children).Zip(GetRandomOrderPopulation(orederValidPopulation).Take(children)).Select(Crossover))
-                    .ToImmutableList());
+                    .Concat(SelectChromosomes(EvaluateBySpecies(orderedValidPopulation.Skip(1)).OrderByDescending(ec => ec.Fitness).Take(populationSize - (mutants + children))))
+                    .Concat(SelectChromosomes(GetRandomOrderPopulation(orderedValidPopulation).Take(mutants)).Select(Mutate))
+                    .Concat(GetRandomOrderPopulation(orderedValidPopulation).Take(children).Zip(GetRandomOrderPopulation(orderedValidPopulation).Take(children)).Select(Crossover))
+                    .ToImmutableArray());
             }
 
             IEnumerable<EvaluatedChromosome> EvaluateBySpecies(IEnumerable<EvaluatedChromosome> evaluatedChromosomes)
@@ -158,20 +158,21 @@ namespace SpikingNeuroEvolution
                 IEnumerable<EvaluatedChromosome> evaluatedPopulation
             ) => evaluatedPopulation.Select(ec => ec.Chromosome);
 
-            ImmutableList<EvaluatedChromosome> EvaluatePopulation(
+            ImmutableArray<EvaluatedChromosome> EvaluatePopulation(
                 IEnumerable<Chromosome> chromosomes
             ) => EvaluateWithEvaluator(chromosomes, CreateRandomChromosomeEvaluator());
 
-            ImmutableList<EvaluatedChromosome> EvaluateWithEvaluator(
+            ImmutableArray<EvaluatedChromosome> EvaluateWithEvaluator(
                 IEnumerable<Chromosome> chromosomes,
                 Func<Chromosome, double> chromosomeEvaluator
             ) => chromosomes
                 .Select(chromosome => new EvaluatedChromosome(chromosome, chromosomeEvaluator(chromosome)))
-                .ToImmutableList();
+                .ToImmutableArray();
 
             Chromosome Crossover((EvaluatedChromosome First, EvaluatedChromosome Second) pair)
             {
                 return Chromosome.Crossover(pair.First.Chromosome, pair.Second.Chromosome,
+                    (na, nb) => new NodeGene(rnd.NextDouble() < 0.5 ? na.FunctionType : nb.FunctionType, rnd.NextDouble() < 0.5 ? na.AggregationType : nb.AggregationType, na.NodeType),
                     (ea, eb) => new EdgeGene((ea.Weight + eb.Weight) / 2, ea.IsEnabled ^ eb.IsEnabled ? rnd.NextDouble() < 0.5 : ea.IsEnabled && ea.IsEnabled)
                 );
             }
@@ -198,14 +199,29 @@ namespace SpikingNeuroEvolution
             {
                 var choice = rnd.NextDouble();
 
-                if (choice < 0.1)
+                if (choice < 0.01)
                 {
-                    return chromosome.MutateAddNode(rnd.Next, ChooseNodeType(), ChooseAggregationType(), rnd.NextDouble() * 2 - 1, rnd.NextDouble() * 2 - 1);
+                    return chromosome.MutateAddNode(rnd.Next, RandomNode(), rnd.NextDouble() * 2 - 1, rnd.NextDouble() * 2 - 1);
                 }
 
-                if (choice < 0.2)
+                if (choice < 0.3)
+                {
+                    return chromosome.MutateChangeNode(rnd.Next, n => RandomNode());
+                }
+
+                if (choice < 0.4)
                 {
                     return chromosome.MutateAddEdge(rnd.Next, rnd.NextDouble() * 2 - 1);
+                }
+
+                if (choice < 0.41)
+                {
+                    return chromosome.MutateCollapseNode(rnd.Next);
+                }
+
+                if (choice < 0.8)
+                {
+                    return chromosome.MutateDeleteNode(rnd.Next);
                 }
 
                 if (choice < 0.9)
@@ -214,6 +230,11 @@ namespace SpikingNeuroEvolution
                 }
 
                 return chromosome.MutateChangeEnabled(rnd.Next);
+            }
+
+            NodeGene RandomNode()
+            {
+                return new NodeGene(ChooseNodeType(), ChooseAggregationType(), NodeType.Inner);
             }
 
             FunctionType ChooseNodeType()
@@ -286,24 +307,24 @@ namespace SpikingNeuroEvolution
             }
         }
 
-        private static (Chromosome, ImmutableArray<NodeGene>, ImmutableArray<NodeGene>) CreateSeedChromosome(int inputGenesCount, int outputGenesCount)
+        private static (Chromosome, ImmutableArray<NodeGeneType>, ImmutableArray<NodeGeneType>) CreateSeedChromosome(int inputGenesCount, int outputGenesCount)
         {
-            var inputGenes = CreateNodeGenes(inputGenesCount, NodeType.Input);
-            var outputGenes = CreateNodeGenes(outputGenesCount, NodeType.Output);
+            var inputGenes = CreateNodeGenes(inputGenesCount);
+            var outputGenes = CreateNodeGenes(outputGenesCount);
 
             var seedChromosome = Chromosome.Build((e, n) =>
             {
-                n.UnionWith(inputGenes);
-                n.UnionWith(outputGenes);
+                n.AddRange(inputGenes.Select(ng => KeyValuePair.Create(ng, new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Input))));
+                n.AddRange(outputGenes.Select(ng => KeyValuePair.Create(ng, new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Output))));
             });
 
             return (seedChromosome, inputGenes, outputGenes);
         }
 
-        private static ImmutableArray<NodeGene> CreateNodeGenes(int count, NodeType nodePurpose)
+        private static ImmutableArray<NodeGeneType> CreateNodeGenes(int count)
         {
             return Enumerable.Range(0, count)
-                .Select(i => new NodeGene(NodeGene.RandomInnovationId(), FunctionType.Identity, AggregationType.Sum, nodePurpose))
+                .Select(i => new NodeGeneType(NodeGeneType.RandomInnovationId()))
                 .ToImmutableArray();
         }
     }

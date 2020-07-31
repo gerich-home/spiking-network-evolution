@@ -20,16 +20,17 @@ namespace SpikingNeuroEvolution
 
         private static void TestCPPN()
         {
-            var n1 = new NodeGene(NodeGene.RandomInnovationId(), FunctionType.Identity, AggregationType.Sum, NodeType.Input);
-            var n2 = new NodeGene(NodeGene.RandomInnovationId(), FunctionType.Identity, AggregationType.Sum, NodeType.Input);
-            var n3 = new NodeGene(NodeGene.RandomInnovationId(), FunctionType.Sin, AggregationType.Sum, NodeType.Inner);
-            var n4 = new NodeGene(NodeGene.RandomInnovationId(), FunctionType.Identity, AggregationType.Sum, NodeType.Output);
+            var n1 = new NodeGeneType(NodeGeneType.RandomInnovationId());
+            var n2 = new NodeGeneType(NodeGeneType.RandomInnovationId());
+            var n3 = new NodeGeneType(NodeGeneType.RandomInnovationId());
+            var n4 = new NodeGeneType(NodeGeneType.RandomInnovationId());
 
             var chromosome = Chromosome.Build((e, n) => {
-                n.Add(n1);
-                n.Add(n2);
-                n.Add(n3);
-                n.Add(n4);
+                n.Add(n1, new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Input));
+                n.Add(n2, new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Input));
+                n.Add(n3, new NodeGene(FunctionType.Sin, AggregationType.Sum, NodeType.Inner));
+                n.Add(n4, new NodeGene(FunctionType.Identity, AggregationType.Sum, NodeType.Output));
+
                 e.Add(new EdgeGeneType(n1, n3), new EdgeGene(1, true));
                 e.Add(new EdgeGeneType(n2, n3), new EdgeGene(1, true));
                 e.Add(new EdgeGeneType(n1, n4), new EdgeGene(1, true));
@@ -37,16 +38,17 @@ namespace SpikingNeuroEvolution
             });
 
             var a = chromosome
-                .MutateAddNode(n => n / 2, FunctionType.Log, AggregationType.Sum, 1, 1)
-                .MutateAddNode(n => n / 3, FunctionType.Log, AggregationType.Sum, 1, 1)
+                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Log, AggregationType.Sum, NodeType.Inner), 1, 1)
+                .MutateAddNode(n => n / 3, new NodeGene(FunctionType.Log, AggregationType.Sum, NodeType.Inner), 1, 1)
                 .MutateChangeEnabled(n => n / 4)
                 .MutateChangeWeight(n => n / 3, 1);
 
             var b = chromosome
-                .MutateAddNode(n => n / 2, FunctionType.Exponent, AggregationType.Sum, 1, 1)
-                .MutateAddNode(n => n / 2, FunctionType.Heaviside, AggregationType.Sum, 1, 1);
+                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Exponent, AggregationType.Sum, NodeType.Inner), 1, 1)
+                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Heaviside, AggregationType.Sum, NodeType.Inner), 1, 1);
             
             var c = Chromosome.Crossover(a, b,
+                (na, nb) => new NodeGene(na.FunctionType, na.AggregationType, na.NodeType),
                 (ea, eb) => new EdgeGene((ea.Weight + eb.Weight)/ 2, true)
             );
 
