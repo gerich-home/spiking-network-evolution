@@ -38,14 +38,14 @@ namespace SpikingNeuroEvolution
             });
 
             var a = chromosome
-                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Log, AggregationType.Sum, NodeType.Inner), 1, 1)
-                .MutateAddNode(n => n / 3, new NodeGene(FunctionType.Log, AggregationType.Sum, NodeType.Inner), 1, 1)
+                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Log, AggregationType.Sum, NodeType.Inner))
+                .MutateAddNode(n => n / 3, new NodeGene(FunctionType.Log, AggregationType.Sum, NodeType.Inner))
                 .MutateChangeEnabled(n => n / 4)
                 .MutateChangeWeight(n => n / 3, 1);
 
             var b = chromosome
-                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Exponent, AggregationType.Sum, NodeType.Inner), 1, 1)
-                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Heaviside, AggregationType.Sum, NodeType.Inner), 1, 1);
+                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Exponent, AggregationType.Sum, NodeType.Inner))
+                .MutateAddNode(n => n / 2, new NodeGene(FunctionType.Heaviside, AggregationType.Sum, NodeType.Inner));
             
             var c = Chromosome.Crossover(a, b,
                 (na, nb) => new NodeGene(na.FunctionType, na.AggregationType, na.NodeType),

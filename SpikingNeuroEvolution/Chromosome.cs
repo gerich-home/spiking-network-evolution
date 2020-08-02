@@ -69,9 +69,7 @@ namespace SpikingNeuroEvolution
 
         public Chromosome MutateAddNode(
             Func<int, int> chooseEdgeGeneTypeIndex,
-            NodeGene newNodeGene,
-            double fromWeight,
-            double toWeight
+            NodeGene newNodeGene
         ) =>
             Change((e, n) => {
                 if (EdgeGenes.Count == 0) {
@@ -83,8 +81,8 @@ namespace SpikingNeuroEvolution
                 e[edgeGeneType] = edgeGene.Disable();
                 var newNodeGeneType = new NodeGeneType(NodeGeneType.InnovationIdByParents(edgeGeneType.From, edgeGeneType.To));
                 n[newNodeGeneType] = newNodeGene;
-                e[new EdgeGeneType(edgeGeneType.From, newNodeGeneType)] = new EdgeGene(fromWeight, true);
-                e[new EdgeGeneType(newNodeGeneType, edgeGeneType.To)] = new EdgeGene(toWeight, true);
+                e[new EdgeGeneType(edgeGeneType.From, newNodeGeneType)] = new EdgeGene(1, true);
+                e[new EdgeGeneType(newNodeGeneType, edgeGeneType.To)] = new EdgeGene(edgeGene.Weight, true);
             });
 
         public Chromosome MutateAddEdge(

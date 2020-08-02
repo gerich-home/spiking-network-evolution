@@ -106,7 +106,7 @@ namespace SpikingNeuroEvolution
 
             double TargetFunction(double x, double y)
             {
-                return x * y;
+                return x * y + Math.Sin(x * y);
             }
 
             ImmutableArray<EvaluatedChromosome> NextPopulation(ImmutableArray<EvaluatedChromosome> evaluatedPopulation)
@@ -119,7 +119,8 @@ namespace SpikingNeuroEvolution
                 var best = orderedValidPopulation.First();
                 
                 return EvaluatePopulation(new []{best.Chromosome}
-                    .Concat(SelectChromosomes(EvaluateBySpecies(orderedValidPopulation.Skip(1)).OrderByDescending(ec => ec.Fitness).Take(populationSize - (mutants + children))))
+                    .Concat(SelectChromosomes(orderedValidPopulation.Skip(1).Take(populationSize - (mutants + children))))
+                    //.Concat(SelectChromosomes(EvaluateBySpecies(orderedValidPopulation.Skip(1)).OrderByDescending(ec => ec.Fitness).Take(populationSize - (mutants + children))))
                     .Concat(SelectChromosomes(GetRandomOrderPopulation(orderedValidPopulation).Take(mutants)).Select(Mutate))
                     .Concat(GetRandomOrderPopulation(orderedValidPopulation).Take(children).Zip(GetRandomOrderPopulation(orderedValidPopulation).Take(children)).Select(Crossover))
                     .ToImmutableArray());
@@ -201,32 +202,32 @@ namespace SpikingNeuroEvolution
 
                 if (choice < 0.01)
                 {
-                    return chromosome.MutateAddNode(rnd.Next, RandomNode(), rnd.NextDouble() * 2 - 1, rnd.NextDouble() * 2 - 1);
+                    return chromosome.MutateAddNode(rnd.Next, RandomNode());
                 }
 
-                if (choice < 0.3)
+                if (choice < 0.05)
                 {
                     return chromosome.MutateChangeNode(rnd.Next, n => RandomNode());
                 }
 
-                if (choice < 0.4)
+                if (choice < 0.2)
                 {
-                    return chromosome.MutateAddEdge(rnd.Next, rnd.NextDouble() * 2 - 1);
+                    return chromosome.MutateAddEdge(rnd.Next, rnd.NextGaussian(0, 2));
                 }
 
-                if (choice < 0.41)
+                if (choice < 0.2)
                 {
                     return chromosome.MutateCollapseNode(rnd.Next);
                 }
 
-                if (choice < 0.8)
+                if (choice < 0.35)
                 {
                     return chromosome.MutateDeleteNode(rnd.Next);
                 }
 
                 if (choice < 0.9)
                 {
-                    return chromosome.MutateChangeWeight(rnd.Next, rnd.NextDouble() * 2 - 1);
+                    return chromosome.MutateChangeWeight(rnd.Next, rnd.NextGaussian());
                 }
 
                 return chromosome.MutateChangeEnabled(rnd.Next);
@@ -309,8 +310,8 @@ namespace SpikingNeuroEvolution
 
         private static (Chromosome, ImmutableArray<NodeGeneType>, ImmutableArray<NodeGeneType>) CreateSeedChromosome(int inputGenesCount, int outputGenesCount)
         {
-            var inputGenes = CreateNodeGenes(inputGenesCount);
-            var outputGenes = CreateNodeGenes(outputGenesCount);
+            var inputGenes = CreateNodeGenes(inputGenesCount, "input");
+            var outputGenes = CreateNodeGenes(outputGenesCount, "output");
 
             var seedChromosome = Chromosome.Build((e, n) =>
             {
@@ -321,10 +322,10 @@ namespace SpikingNeuroEvolution
             return (seedChromosome, inputGenes, outputGenes);
         }
 
-        private static ImmutableArray<NodeGeneType> CreateNodeGenes(int count)
+        private static ImmutableArray<NodeGeneType> CreateNodeGenes(int count, string baseValue)
         {
             return Enumerable.Range(0, count)
-                .Select(i => new NodeGeneType(NodeGeneType.RandomInnovationId()))
+                .Select(i => new NodeGeneType(NodeGeneType.Hash(baseValue + i)))
                 .ToImmutableArray();
         }
     }

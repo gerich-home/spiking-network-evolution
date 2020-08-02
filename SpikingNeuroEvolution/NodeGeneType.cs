@@ -54,7 +54,10 @@ namespace SpikingNeuroEvolution
             Hash(Guid.NewGuid().ToByteArray());
 
         public static string InnovationIdByParents(NodeGeneType a, NodeGeneType b) =>
-            Hash(Encoding.UTF8.GetBytes(a.InnovationId + b.InnovationId));
+            Hash(a.InnovationId + b.InnovationId);
+
+        public static string Hash(string value) =>
+            Hash(Encoding.UTF8.GetBytes(value));
 
         private static string Hash(byte[] buffer)
         {
