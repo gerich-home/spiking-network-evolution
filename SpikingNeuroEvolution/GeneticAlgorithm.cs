@@ -205,7 +205,7 @@ namespace SpikingNeuroEvolution
                     return chromosome.MutateAddNode(rnd.Next, RandomNode());
                 }
 
-                if (choice < 0.05)
+                if (choice < 0.01)
                 {
                     return chromosome.MutateChangeNode(rnd.Next, n => RandomNode());
                 }
@@ -227,7 +227,7 @@ namespace SpikingNeuroEvolution
 
                 if (choice < 0.9)
                 {
-                    return chromosome.MutateChangeWeight(rnd.Next, rnd.NextGaussian());
+                    return chromosome.MutateChangeWeight(rnd.Next, rnd.NextGaussian(0, 10));
                 }
 
                 return chromosome.MutateChangeEnabled(rnd.Next);

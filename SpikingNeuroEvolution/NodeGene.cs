@@ -1,7 +1,7 @@
 namespace SpikingNeuroEvolution
 {
 
-    class NodeGene
+    struct NodeGene
     {
         public readonly FunctionType FunctionType;
         public readonly NodeType NodeType;

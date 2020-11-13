@@ -72,14 +72,15 @@ namespace SpikingNeuroEvolution
             NodeGene newNodeGene
         ) =>
             Change((e, n) => {
-                if (EdgeGenes.Count == 0) {
+                var enabledEdges = EdgeGenes.Where(edge => edge.Value.IsEnabled).Select(edge => edge.Key).ToImmutableList();
+                if (enabledEdges.Count == 0) {
                     return;
                 }
 
-                var edgeGeneType = EdgeGenes.Keys.ElementAt(chooseEdgeGeneTypeIndex(EdgeGenes.Count));
+                var edgeGeneType = enabledEdges.ElementAt(chooseEdgeGeneTypeIndex(enabledEdges.Count));
                 var edgeGene = EdgeGenes[edgeGeneType];
                 e[edgeGeneType] = edgeGene.Disable();
-                var newNodeGeneType = new NodeGeneType(NodeGeneType.InnovationIdByParents(edgeGeneType.From, edgeGeneType.To));
+                var newNodeGeneType = new NodeGeneType(NodeGeneType.InnovationIdByParents(edgeGeneType.From, edgeGeneType.To, newNodeGene));
                 n[newNodeGeneType] = newNodeGene;
                 e[new EdgeGeneType(edgeGeneType.From, newNodeGeneType)] = new EdgeGene(1, true);
                 e[new EdgeGeneType(newNodeGeneType, edgeGeneType.To)] = new EdgeGene(edgeGene.Weight, true);
