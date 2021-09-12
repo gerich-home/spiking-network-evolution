@@ -5,6 +5,71 @@ using System.Linq;
 
 namespace SpikingNeuroEvolution
 {
+    class Species
+    {
+        public ImmutableHashSet<Chromosome> Chromosomes { get; }
+        public int Size => Chromosomes.Count;
+
+        public double AverageFitness(EvaluatedPopulation evaluation) => Chromosomes.Average(evaluation.Fitness);
+
+        public Species(ImmutableHashSet<Chromosome> chromosomes)
+        {
+            Chromosomes = chromosomes;
+        }
+    }
+
+    class SpeciesSet
+    {
+        private ImmutableDictionary<Chromosome, Species> ChromosomesToSpecies { get; }
+
+        private SpeciesSet(ImmutableDictionary<Chromosome, Species> chromosomesToSpecies)
+        {
+            ChromosomesToSpecies = chromosomesToSpecies;
+        }
+
+        public Species GetSpecies(Chromosome chromosome) => ChromosomesToSpecies[chromosome];
+        public IEnumerable<Species> AllSpecies => ChromosomesToSpecies.Values;
+
+        public static SpeciesSet Build(IEnumerable<Chromosome> chromosomes, ChromosomeComparisonParams comparisonParams)
+        {
+            var builder = ImmutableHashSet.CreateBuilder<Species>();
+    
+            var species = new Dictionary<Chromosome, HashSet<Chromosome>>();
+
+            foreach(var chromosome in chromosomes) 
+            {
+                var specieRepresentative = species.Keys
+                    .FirstOrDefault(representative => Chromosome.Compare(representative, chromosome, comparisonParams) < comparisonParams.Threshold);
+                
+                var targetSpecies = specieRepresentative == null ?
+                    new HashSet<Chromosome>{} :
+                    species[specieRepresentative];
+
+                targetSpecies.Add(chromosome);
+                species[chromosome] = targetSpecies;
+            }
+
+            var createdSpecies = species.Values
+                .ToDictionary(chromosomesInSpecies => chromosomesInSpecies, chromosomesInSpecies => new Species(chromosomesInSpecies.ToImmutableHashSet()));
+            
+            return new SpeciesSet(species.ToImmutableDictionary(pair => pair.Key, pair => createdSpecies[pair.Value]));
+        }
+    }
+
+    class ChromosomeComparisonParams
+    {
+        public double NodeWeight { get; }
+        public double EdgeWeight { get; }
+        public double Threshold { get; }
+
+        public ChromosomeComparisonParams(double nodeWeight, double edgeWeight, double threshold)
+        {
+            NodeWeight = nodeWeight;
+            EdgeWeight = edgeWeight;
+            Threshold = threshold;
+        }
+    }
+    
     class GeneticAlgorithm
     {
         public void Test()
@@ -16,7 +81,7 @@ namespace SpikingNeuroEvolution
             const int populationSize = 30;
             const int mutants = 10;
             const int children = 5;
-            var population = EvaluatePopulation(CreateInitialPopulation(seedChromosome, populationSize)).ToImmutableArray();
+            var population = EvaluatePopulation(CreateInitialPopulation(seedChromosome, populationSize));
 
             var goldExamples = new (double, double)[]{
                 (1, 2),
@@ -29,16 +94,17 @@ namespace SpikingNeuroEvolution
                 (100, 20),
             }.ToImmutableArray();
             var goldEvaluator = CreateChromosomeEvaluator(goldExamples);
-            EvaluatedChromosome best;
+            Chromosome best;
             for (int i = 0; true; i++) {
-                best = EvaluateWithEvaluator(SelectChromosomes(population), goldEvaluator)
-                    .OrderByDescending(e => e.Fitness).First();
-                Console.WriteLine($"nodes={best.Chromosome.NodeGenes.Count - (inputGenes.Length + outputGenes.Length)} edges={best.Chromosome.EdgeGenes.Count(e => e.Value.IsEnabled)} -> fitness: {1 / best.Fitness}");
+                var goldEvaluation = new EvaluatedPopulation(population.Chromosomes, goldEvaluator);
+
+                best = goldEvaluation.Best;
+                Console.WriteLine($"nodes={best.NodeGenes.Count - (inputGenes.Length + outputGenes.Length)} edges={best.EdgeGenes.Count(e => e.Value.IsEnabled)} -> fitness: {1 / goldEvaluation.Fitness(best)}");
 
                 foreach(var example in goldExamples)
                 {
                     var (x, y) = example;
-                    Console.WriteLine($"f({x}, {y}) -> {EvaluatePhenotype(best.Chromosome, example)}");
+                    Console.WriteLine($"f({x}, {y}) -> {EvaluatePhenotype(best, example)}");
                 }
                 
                 population = NextPopulation(population);
@@ -48,7 +114,7 @@ namespace SpikingNeuroEvolution
             {
                 for (int j = 0; j < 5; j++)
                 {
-                    Console.WriteLine($"f({i}, {j}) -> {EvaluatePhenotype(best.Chromosome, (i, j))} ({TargetFunction(i, j)})");
+                    Console.WriteLine($"f({i}, {j}) -> {EvaluatePhenotype(best, (i, j))} ({TargetFunction(i, j)})");
                 }
             }
 
@@ -63,7 +129,7 @@ namespace SpikingNeuroEvolution
 
             Func<Chromosome, double> CreateChromosomeEvaluator(
                 ImmutableArray<(double, double)> examples
-            ) => chromose => EvaluateChromosome(chromose, examples);
+            ) => chromosome => EvaluateChromosome(chromosome, examples);
 
             double EvaluateChromosome(Chromosome chromosome, IEnumerable<(double, double)> examples)
             {
@@ -109,81 +175,43 @@ namespace SpikingNeuroEvolution
                 return x * y + Math.Sin(x * y);
             }
 
-            ImmutableArray<EvaluatedChromosome> NextPopulation(ImmutableArray<EvaluatedChromosome> evaluatedPopulation)
+            EvaluatedPopulation NextPopulation(EvaluatedPopulation evaluatedPopulation)
             {
-                var orderedValidPopulation = evaluatedPopulation
-                    .Where(ec => !double.IsNaN(ec.Fitness))
-                    .OrderByDescending(ec => ec.Fitness)
-                    .ToImmutableArray();
+                var speciesSet = SpeciesSet.Build(evaluatedPopulation.AliveChromosomes, new ChromosomeComparisonParams(3, 1, 2));
 
-                var best = orderedValidPopulation.First();
-                
-                return EvaluatePopulation(new []{best.Chromosome}
-                    .Concat(SelectChromosomes(orderedValidPopulation.Skip(1).Take(populationSize - (mutants + children))))
-                    //.Concat(SelectChromosomes(EvaluateBySpecies(orderedValidPopulation.Skip(1)).OrderByDescending(ec => ec.Fitness).Take(populationSize - (mutants + children))))
-                    .Concat(SelectChromosomes(GetRandomOrderPopulation(orderedValidPopulation).Take(mutants)).Select(Mutate))
-                    .Concat(GetRandomOrderPopulation(orderedValidPopulation).Take(children).Zip(GetRandomOrderPopulation(orderedValidPopulation).Take(children)).Select(Crossover))
-                    .ToImmutableArray());
-            }
+                var sizes = speciesSet.AllSpecies.ToDictionary(species => species, species => species.Size);
+                var speciesFitnesses = speciesSet.AllSpecies.ToDictionary(species => species, species => species.AverageFitness(evaluatedPopulation));
+                var totalPopulationSize = evaluatedPopulation.Size;
+                var totalFitness = speciesFitnesses.Sum(p => p.Value);
+                var fitnessCost = totalPopulationSize / totalFitness;
 
-            IEnumerable<EvaluatedChromosome> EvaluateBySpecies(IEnumerable<EvaluatedChromosome> evaluatedChromosomes)
-            {
-                var species = new Dictionary<Chromosome, HashSet<Chromosome>>();
-                var chromosomeToSpecies = new Dictionary<Chromosome, HashSet<Chromosome>>();
-                foreach(var ec in evaluatedChromosomes) 
-                {
-                    var specieRepresentative = species.Keys
-                        .FirstOrDefault(y => Chromosome.Compare(y, ec.Chromosome, 3, 1) < 2);
-                    
-                    if (specieRepresentative == null)
+                var chromosomes = speciesSet.AllSpecies
+                    .SelectMany(species =>
                     {
-                        var newSpecie = new HashSet<Chromosome>{ec.Chromosome};
-                        species[ec.Chromosome] = newSpecie;
-                        chromosomeToSpecies[ec.Chromosome] = newSpecie;
-                    }
-                    else
-                    {
-                        var specie = species[specieRepresentative];
-                        specie.Add(ec.Chromosome);
-                        chromosomeToSpecies[ec.Chromosome] = specie;
-                    }
-                }
+                        var allocatedSize = (int)(speciesFitnesses[species] * fitnessCost);
 
-
-                var sizes = species.ToDictionary(kv => kv.Key, kv => kv.Value.Count);
-                return evaluatedChromosomes
-                    .Select(ec => new EvaluatedChromosome(ec.Chromosome, ec.Fitness / chromosomeToSpecies[ec.Chromosome].Count));
+                        return species.Chromosomes
+                            .Select(Mutate)
+                            .Take(mutants)
+                            .Take(allocatedSize);
+                    });
+                return EvaluatePopulation(chromosomes);
             }
 
             IEnumerable<Chromosome> SelectChromosomes(
-                IEnumerable<EvaluatedChromosome> evaluatedPopulation
-            ) => evaluatedPopulation.Select(ec => ec.Chromosome);
+                EvaluatedPopulation evaluatedPopulation
+            ) => evaluatedPopulation.Chromosomes;
 
-            ImmutableArray<EvaluatedChromosome> EvaluatePopulation(
+            EvaluatedPopulation EvaluatePopulation(
                 IEnumerable<Chromosome> chromosomes
-            ) => EvaluateWithEvaluator(chromosomes, CreateRandomChromosomeEvaluator());
+            ) => new EvaluatedPopulation(chromosomes, CreateRandomChromosomeEvaluator());
 
-            ImmutableArray<EvaluatedChromosome> EvaluateWithEvaluator(
-                IEnumerable<Chromosome> chromosomes,
-                Func<Chromosome, double> chromosomeEvaluator
-            ) => chromosomes
-                .Select(chromosome => new EvaluatedChromosome(chromosome, chromosomeEvaluator(chromosome)))
-                .ToImmutableArray();
-
-            Chromosome Crossover((EvaluatedChromosome First, EvaluatedChromosome Second) pair)
+            Chromosome Crossover((Chromosome First, Chromosome Second) pair)
             {
-                return Chromosome.Crossover(pair.First.Chromosome, pair.Second.Chromosome,
+                return Chromosome.Crossover(pair.First, pair.Second,
                     (na, nb) => new NodeGene(rnd.NextDouble() < 0.5 ? na.FunctionType : nb.FunctionType, rnd.NextDouble() < 0.5 ? na.AggregationType : nb.AggregationType, na.NodeType),
                     (ea, eb) => new EdgeGene((ea.Weight + eb.Weight) / 2, ea.IsEnabled ^ eb.IsEnabled ? rnd.NextDouble() < 0.5 : ea.IsEnabled && ea.IsEnabled)
                 );
-            }
-
-            IEnumerable<EvaluatedChromosome> GetRandomOrderPopulation(IEnumerable<EvaluatedChromosome> population)
-            {
-                return population
-                    .Select(chromosome => new { chromosome, order = rnd.Next() })
-                    .OrderBy(p => p.order)
-                    .Select(p => p.chromosome);
             }
 
             IEnumerable<Chromosome> CreateInitialPopulation(Chromosome seedChromosome, int populationSize)

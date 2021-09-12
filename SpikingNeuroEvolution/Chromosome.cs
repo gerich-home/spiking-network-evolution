@@ -245,7 +245,7 @@ namespace SpikingNeuroEvolution
                 );
             });
 
-        public static double Compare(Chromosome chromosomeA, Chromosome chromosomeB, double nodeWeight, double edgeWeight)
+        public static double Compare(Chromosome chromosomeA, Chromosome chromosomeB, ChromosomeComparisonParams chromosomeComparisonParams)
         {
             var nodesIntersection = chromosomeA.NodeGenes.Keys.Intersect(chromosomeB.NodeGenes.Keys);
             var edgesIntersection = chromosomeA.EdgeGenes.Keys.Intersect(chromosomeB.EdgeGenes.Keys);
@@ -256,8 +256,12 @@ namespace SpikingNeuroEvolution
             var extraEdgesA = chromosomeA.EdgeGenes.RemoveRange(edgesIntersection);
             var extraEdgesB = chromosomeB.EdgeGenes.RemoveRange(edgesIntersection);
 
-            // TODO
-            return nodeWeight * (extraNodesA.Concat(extraNodesB).Count()) + edgeWeight * (extraEdgesA.Concat(extraEdgesB).Sum(e => Math.Abs(e.Value.ActualWeight)) + edgesIntersection.Sum(e => Math.Abs(chromosomeA.EdgeGenes[e].ActualWeight - chromosomeB.EdgeGenes[e].ActualWeight)));
+            var extraNodesCount = extraNodesA.Count + extraNodesB.Count;
+            var extraEdgeAbsoluteWeight = extraEdgesA.Concat(extraEdgesB).Sum(e => Math.Abs(e.Value.ActualWeight));
+            var matchingEdgesAbsoluteWeightDiff = edgesIntersection.Sum(e => Math.Abs(chromosomeA.EdgeGenes[e].ActualWeight - chromosomeB.EdgeGenes[e].ActualWeight));
+
+            return chromosomeComparisonParams.NodeWeight * extraNodesCount +
+                chromosomeComparisonParams.EdgeWeight * (extraEdgeAbsoluteWeight + matchingEdgesAbsoluteWeightDiff);
         }
     }
 }

@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/SpikingNeuroEvolution/bin/Debug/netcoreapp3.1/SpikingNeuroEvolution.dll",
+            "program": "${workspaceFolder}/SpikingNeuroEvolution/bin/Debug/net5.0/SpikingNeuroEvolution.dll",
             "args": [],
             "cwd": "${workspaceFolder}/SpikingNeuroEvolution",
             "console": "internalConsole",
@@ -18,8 +18,7 @@
         {
             "name": ".NET Core Attach",
             "type": "coreclr",
-            "request": "attach",
-            "processId": "${command:pickProcess}"
+            "request": "attach"
         }
     ]
 }
