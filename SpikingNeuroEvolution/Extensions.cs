@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 
 namespace SpikingNeuroEvolution
 {
@@ -20,6 +22,23 @@ namespace SpikingNeuroEvolution
             {
                 action(item);
             }
+        }
+
+        public static IImmutableDictionary<TKey, TMappedValue> MapBy<TKey, TMappedValue>(this IEnumerable<TMappedValue> enumerable, Func<TMappedValue, TKey> mapKey) =>
+            enumerable.ToImmutableDictionary(value => mapKey(value), value => value);
+
+        public static IImmutableDictionary<TKey, TMappedValue> ToDictionary<TKey, TMappedValue>(this IEnumerable<TKey> enumerable, Func<TKey, TMappedValue> map) =>
+            enumerable.ToImmutableDictionary(value => value, value => map(value));
+
+        public static IImmutableDictionary<TKey, TMappedValue> MapValues<TKey, TValue, TMappedValue>(this IImmutableDictionary<TKey, TValue> dictionary, Func<TValue, TMappedValue> map) =>
+            dictionary.ToImmutableDictionary(pair => pair.Key, pair => map(pair.Value));
+
+        public static IEnumerable<T> RandomlyOrdered<T>(this IEnumerable<T> values, Random rnd)
+        {
+            return values
+                .Select(value => new { value, order = rnd.Next() })
+                .OrderBy(p => p.order)
+                .Select(p => p.value);
         }
     }
 }
