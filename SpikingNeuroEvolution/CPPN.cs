@@ -97,7 +97,7 @@ namespace SpikingNeuroEvolution
             }
 
             if (visitedNodes.Count < Chromosome.NodeGenes.Count) {
-                throw new Exception("Loop in CPPN");
+                throw new LoopInCPPNException();
             }
 
             return OutputGenes.Select(gene => nodeOutput[gene]).ToImmutableArray();

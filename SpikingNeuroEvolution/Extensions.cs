@@ -40,5 +40,15 @@ namespace SpikingNeuroEvolution
                 .OrderBy(p => p.order)
                 .Select(p => p.value);
         }
+
+        public static IEnumerable<T> RandomlyRepeated<T>(this IEnumerable<T> values, Random rnd)
+        {
+            var list = values.ToImmutableList();
+
+            while (true)
+            {
+                yield return list[rnd.Next(list.Count)];
+            }
+        }
     }
 }

@@ -4,7 +4,7 @@ namespace SpikingNeuroEvolution
 {
     public static class RandomExtensions
     {
-        public static double NextGaussian(this Random rnd, double mean = 0, double stdDev = 1) 
+        public static double NextGaussian(this Random rnd, double mean, double stdDev) 
         {
             double u1 = 1.0 - rnd.NextDouble();
             double u2 = 1.0 - rnd.NextDouble();

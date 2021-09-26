@@ -11,8 +11,11 @@ namespace SpikingNeuroEvolution
         public readonly ImmutableDictionary<NodeGeneType, NodeGene> NodeGenes;
         public readonly ImmutableDictionary<EdgeGeneType, EdgeGene> EdgeGenes;
 
-        public override string ToString() => $"Chromosome: {{Nodes: [{string.Join(", ", NodeGenes.Keys.Select(n => n.ShortId).OrderBy(x => x))}], Edges: [TODO]}}";
-        
+        public override string ToString() => $"Chromosome: {{Nodes: [{NodesString}], Edges: [{EdgesString}]}}";
+
+        private string NodesString => string.Join(", ", NodeGenes.Keys.Select(n => n.ShortId).OrderBy(x => x));
+        private string EdgesString => string.Join(", ", EdgeGenes.Select(e => $"[{e.Key.From.ShortId}->{e.Key.To.ShortId}:{e.Value.Weight}{(e.Value.IsEnabled ? "" : "DIS")}]"));
+
         public Chromosome(ImmutableDictionary<NodeGeneType, NodeGene> nodeGenes, ImmutableDictionary<EdgeGeneType, EdgeGene> edgeGenes)
         {
             CheckValid(nodeGenes, edgeGenes);
@@ -71,9 +74,11 @@ namespace SpikingNeuroEvolution
             Func<int, int> chooseEdgeGeneTypeIndex,
             NodeGene newNodeGene
         ) =>
-            Change((e, n) => {
+            Change((e, n) =>
+            {
                 var enabledEdges = EdgeGenes.Where(edge => edge.Value.IsEnabled).Select(edge => edge.Key).ToImmutableList();
-                if (enabledEdges.Count == 0) {
+                if (enabledEdges.Count == 0)
+                {
                     return;
                 }
 
@@ -90,7 +95,8 @@ namespace SpikingNeuroEvolution
             Func<int, int> chooseEdgeGeneTypeIndex,
             double weight
         ) =>
-            Change((e, n) => {
+            Change((e, n) =>
+            {
                 var missingEdges = NodeGenes
                     .Keys
                     .Where(fromGene => NodeGenes[fromGene].NodeType != NodeType.Output)
@@ -100,8 +106,9 @@ namespace SpikingNeuroEvolution
                     .ToImmutableHashSet()
                     .Except(EdgeGenes.Keys)
                     .Except(EdgeGenes.Keys.Select(key => new EdgeGeneType(key.To, key.From)));
-                
-                if (missingEdges.Count == 0) {
+
+                if (missingEdges.Count == 0)
+                {
                     return;
                 }
 
@@ -112,11 +119,13 @@ namespace SpikingNeuroEvolution
             Func<int, int> chooseNodeGeneTypeIndex,
             Func<NodeGene, NodeGene> change
         ) =>
-            Change((e, n) => {
+            Change((e, n) =>
+            {
                 var innerNodes = NodeGenes
                     .Where(n => n.Value.NodeType == NodeType.Inner)
                     .ToImmutableArray();
-                if (innerNodes.Length == 0) {
+                if (innerNodes.Length == 0)
+                {
                     return;
                 }
 
@@ -127,11 +136,13 @@ namespace SpikingNeuroEvolution
         public Chromosome MutateDeleteNode(
             Func<int, int> chooseNodeGeneTypeIndex
         ) =>
-            Change((e, n) => {
+            Change((e, n) =>
+            {
                 var innerNodes = NodeGenes
                     .Where(n => n.Value.NodeType == NodeType.Inner)
                     .ToImmutableArray();
-                if (innerNodes.Length == 0) {
+                if (innerNodes.Length == 0)
+                {
                     return;
                 }
 
@@ -144,11 +155,13 @@ namespace SpikingNeuroEvolution
         public Chromosome MutateCollapseNode(
             Func<int, int> chooseNodeGeneTypeIndex
         ) =>
-            Change((e, n) => {
+            Change((e, n) =>
+            {
                 var innerNodes = NodeGenes
                     .Where(n => n.Value.NodeType == NodeType.Inner)
                     .ToImmutableArray();
-                if (innerNodes.Length == 0) {
+                if (innerNodes.Length == 0)
+                {
                     return;
                 }
 
@@ -157,14 +170,14 @@ namespace SpikingNeuroEvolution
 
                 var inputEdges = EdgeGenes.Keys.Where(edge => edge.To.Equals(nodeGeneType)).ToImmutableArray();
                 var outputEdges = EdgeGenes.Keys.Where(edge => edge.From.Equals(nodeGeneType)).ToImmutableArray();
-                
+
                 var totalInput = NodeGenes[nodeGeneType].AggregationType == AggregationType.Sum ?
                     inputEdges.Select(edge => EdgeGenes[edge].ActualWeight).Sum() :
                     inputEdges.Select(edge => EdgeGenes[edge].ActualWeight).Aggregate(1.0, (x, y) => x * y);
-                
+
                 var inputNodes = inputEdges.Select(edge => edge.From).ToImmutableArray();
                 var outputNodes = outputEdges.Select(edge => edge.To).ToImmutableArray();
-                
+
                 var collapsedEdges = inputNodes.SelectMany(
                     i => outputNodes.Select(
                         o => KeyValuePair.Create(
@@ -175,7 +188,7 @@ namespace SpikingNeuroEvolution
                 ).ToImmutableHashSet();
                 e.RemoveRange(collapsedEdges.Select(edge => edge.Key));
                 e.AddRange(collapsedEdges);
-                
+
                 e.RemoveRange(inputEdges);
                 e.RemoveRange(outputEdges);
             });
@@ -184,8 +197,10 @@ namespace SpikingNeuroEvolution
             Func<int, int> chooseEdgeGeneTypeIndex,
             double weightChange
         ) =>
-            Change(e => {
-                if (EdgeGenes.Count == 0) {
+            Change(e =>
+            {
+                if (EdgeGenes.Count == 0)
+                {
                     return;
                 }
 
@@ -197,8 +212,10 @@ namespace SpikingNeuroEvolution
         public Chromosome MutateChangeEnabled(
             Func<int, int> chooseEdgeGeneTypeIndex
         ) =>
-            Change(e => {
-                if (EdgeGenes.Count == 0) {
+            Change(e =>
+            {
+                if (EdgeGenes.Count == 0)
+                {
                     return;
                 }
 
@@ -213,7 +230,8 @@ namespace SpikingNeuroEvolution
             Func<NodeGene, NodeGene, NodeGene> crossoverMatchingNodeGene,
             Func<EdgeGene, EdgeGene, EdgeGene> crossoverMatchingEdgeGene
         ) =>
-            Build((e, n) => {
+            Build((e, n) =>
+            {
                 var nodeGenesA = chromosomeA.NodeGenes;
                 var nodeGenesB = chromosomeB.NodeGenes;
 
@@ -247,21 +265,17 @@ namespace SpikingNeuroEvolution
 
         public static double Compare(Chromosome chromosomeA, Chromosome chromosomeB, ChromosomeComparisonParams chromosomeComparisonParams)
         {
-            var nodesIntersection = chromosomeA.NodeGenes.Keys.Intersect(chromosomeB.NodeGenes.Keys);
-            var edgesIntersection = chromosomeA.EdgeGenes.Keys.Intersect(chromosomeB.EdgeGenes.Keys);
-
-            var extraNodesA = chromosomeA.NodeGenes.RemoveRange(nodesIntersection);
-            var extraNodesB = chromosomeB.NodeGenes.RemoveRange(nodesIntersection);
+            var edgesIntersection = chromosomeA.EdgeGenes.Keys.Intersect(chromosomeB.EdgeGenes.Keys).ToImmutableList();
 
             var extraEdgesA = chromosomeA.EdgeGenes.RemoveRange(edgesIntersection);
             var extraEdgesB = chromosomeB.EdgeGenes.RemoveRange(edgesIntersection);
 
-            var extraNodesCount = extraNodesA.Count + extraNodesB.Count;
-            var extraEdgeAbsoluteWeight = extraEdgesA.Concat(extraEdgesB).Sum(e => Math.Abs(e.Value.ActualWeight));
-            var matchingEdgesAbsoluteWeightDiff = edgesIntersection.Sum(e => Math.Abs(chromosomeA.EdgeGenes[e].ActualWeight - chromosomeB.EdgeGenes[e].ActualWeight));
+            var extraEdgesCount = extraEdgesA.Count + extraEdgesB.Count;
+            var maxEdgesCount = Math.Max(chromosomeA.EdgeGenes.Count, chromosomeB.EdgeGenes.Count);
+            var averageMatchingEdgesAbsoluteWeightDiff = edgesIntersection.Count == 0 ? 0 : edgesIntersection.Average(e => Math.Abs(chromosomeA.EdgeGenes[e].ActualWeight - chromosomeB.EdgeGenes[e].ActualWeight));
 
-            return chromosomeComparisonParams.NodeWeight * extraNodesCount +
-                chromosomeComparisonParams.EdgeWeight * (extraEdgeAbsoluteWeight + matchingEdgesAbsoluteWeightDiff);
+            return chromosomeComparisonParams.NodeWeight * extraEdgesCount / maxEdgesCount +
+                chromosomeComparisonParams.EdgeWeight * averageMatchingEdgesAbsoluteWeightDiff;
         }
     }
 }

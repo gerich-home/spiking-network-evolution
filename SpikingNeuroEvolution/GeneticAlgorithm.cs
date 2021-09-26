@@ -1,77 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 
 namespace SpikingNeuroEvolution
 {
-    class Species
-    {
-        public ImmutableHashSet<Chromosome> Chromosomes { get; }
-        public int Size => Chromosomes.Count;
-
-        public double AverageFitness(EvaluatedPopulation evaluation) => Chromosomes.Average(evaluation.Fitness);
-
-        public Species(ImmutableHashSet<Chromosome> chromosomes)
-        {
-            Chromosomes = chromosomes;
-        }
-    }
-
-    class SpeciesSet
-    {
-        private ImmutableDictionary<Chromosome, Species> ChromosomesToSpecies { get; }
-        public ImmutableList<Species> AllSpecies { get; }
-
-        private SpeciesSet(ImmutableDictionary<Chromosome, Species> chromosomesToSpecies)
-        {
-            ChromosomesToSpecies = chromosomesToSpecies;
-            AllSpecies = ChromosomesToSpecies.Values.Distinct().ToImmutableList();
-        }
-
-        public Species GetSpecies(Chromosome chromosome) => ChromosomesToSpecies[chromosome];
-        public int Count => AllSpecies.Count;
-
-        public static SpeciesSet Build(IEnumerable<Chromosome> chromosomes, ChromosomeComparisonParams comparisonParams)
-        {
-            var builder = ImmutableHashSet.CreateBuilder<Species>();
-    
-            var species = new Dictionary<Chromosome, HashSet<Chromosome>>();
-
-            foreach(var chromosome in chromosomes) 
-            {
-                var specieRepresentative = species.Keys
-                    .FirstOrDefault(representative => Chromosome.Compare(representative, chromosome, comparisonParams) < comparisonParams.Threshold);
-                
-                var targetSpecies = specieRepresentative == null ?
-                    new HashSet<Chromosome>{} :
-                    species[specieRepresentative];
-
-                targetSpecies.Add(chromosome);
-                species[chromosome] = targetSpecies;
-            }
-
-            var createdSpecies = species.Values.Distinct()
-                .ToDictionary(chromosomesInSpecies => chromosomesInSpecies, chromosomesInSpecies => new Species(chromosomesInSpecies.ToImmutableHashSet()));
-            
-            return new SpeciesSet(species.ToImmutableDictionary(pair => pair.Key, pair => createdSpecies[pair.Value]));
-        }
-    }
-
-    class ChromosomeComparisonParams
-    {
-        public double NodeWeight { get; }
-        public double EdgeWeight { get; }
-        public double Threshold { get; }
-
-        public ChromosomeComparisonParams(double nodeWeight, double edgeWeight, double threshold)
-        {
-            NodeWeight = nodeWeight;
-            EdgeWeight = edgeWeight;
-            Threshold = threshold;
-        }
-    }
-    
     class GeneticAlgorithm
     {
         public void Test()
@@ -80,7 +14,7 @@ namespace SpikingNeuroEvolution
 
             var rnd = new Random();
 
-            const int populationSize = 30;
+            const int populationSize = 300;
             const double mutantsFraction = 0.3;
             const double childrenFraction = 0.06;
             var population = EvaluatePopulation(CreateInitialPopulation(seedChromosome, populationSize));
@@ -106,7 +40,7 @@ namespace SpikingNeuroEvolution
                 foreach(var example in goldExamples)
                 {
                     var (x, y) = example;
-                    Console.WriteLine($"f({x}, {y}) -> {EvaluatePhenotype(best, example)}");
+                    Console.WriteLine($"f({x}, {y}) -> {EvaluatePhenotype(best, example)} vs {TargetFunction(x, y)}");
                 }
                 
                 population = NextPopulation(population);
@@ -146,7 +80,7 @@ namespace SpikingNeuroEvolution
                         if (double.IsNaN(result)) {
                             return double.NaN;
                         } else if(double.IsInfinity(result)) {
-                            return double.NegativeInfinity;
+                            return 0;
                         } else {
                             worst = Math.Max(worst, Math.Abs(result - TargetFunction(a, b)));
                         }
@@ -158,7 +92,7 @@ namespace SpikingNeuroEvolution
 
                     return 1000 / worst;
                 }
-                catch
+                catch(LoopInCPPNException)
                 {
                     return double.NaN;
                 }
@@ -179,7 +113,8 @@ namespace SpikingNeuroEvolution
 
             EvaluatedPopulation NextPopulation(EvaluatedPopulation evaluatedPopulation)
             {
-                var speciesSet = SpeciesSet.Build(evaluatedPopulation.AliveChromosomes, new ChromosomeComparisonParams(3, 0.3, 10));
+                var comparisonParams = new ChromosomeComparisonParams(1, 2, 4);
+                var speciesSet = SpeciesSet.Build(evaluatedPopulation.AliveChromosomes, comparisonParams);
 
                 Console.WriteLine($"Species: {speciesSet.Count}");
 
@@ -189,8 +124,7 @@ namespace SpikingNeuroEvolution
                 var fitnessCost = populationSize / totalFitness;
 
                 var guaranteedSizes = speciesFitnesses.MapValues(fitness => (int)(fitness * fitnessCost));
-                var totalUsedSizes = guaranteedSizes.Values.Sum();
-                var remainingSize = populationSize - totalUsedSizes;
+                var remainingSize = populationSize - guaranteedSizes.Values.Sum();
                 
                 var speciesGotExtraIndividual = speciesFitnesses
                     .MapValues(fitness =>
@@ -211,19 +145,26 @@ namespace SpikingNeuroEvolution
                         var mutantsCount = (int)(Math.Round(allocatedSize * mutantsFraction));
                         var childrenCount = (int)(Math.Round(allocatedSize * childrenFraction));
 
-                        var eliteCount = allocatedSize - (mutantsCount + childrenCount);
+                        var eliteCount = Math.Min(species.Chromosomes.Count, allocatedSize - (mutantsCount + childrenCount));
 
                         var elite = species.Chromosomes
                             .OrderByDescending(evaluatedPopulation.Fitness)
                             .Take(eliteCount);
 
-                        var randomChromosomes = species.Chromosomes.RandomlyOrdered(rnd);
-                        var mutants = randomChromosomes.Select(Mutate).Take(mutantsCount);
+                        var randomChromosomes = species.Chromosomes.RandomlyRepeated(rnd);
+                        var mutants = randomChromosomes.Select(Mutate).Take(allocatedSize - (eliteCount + childrenCount));
                         var randomParents = randomChromosomes.Take(childrenCount);
                         var children = randomParents.Zip(randomParents).Select(Crossover);
 
-                        return elite.Concat(mutants).Concat(children);
-                    });
+                        var result = elite.Concat(mutants).Concat(children).ToImmutableList();
+                        
+                        Debug.Assert(result.Count == allocatedSize);
+                        Debug.Assert(result.Count > 0);
+                        return result;
+                    })
+                    .ToImmutableList();
+
+                Debug.Assert(chromosomes.Count == populationSize);
 
                 return EvaluatePopulation(chromosomes);
             }
@@ -254,27 +195,27 @@ namespace SpikingNeuroEvolution
             {
                 var choice = rnd.NextDouble();
 
-                if (choice < 0.01)
+                if (choice < 0.2)
                 {
                     return chromosome.MutateAddNode(rnd.Next, RandomNode());
                 }
 
-                if (choice < 0.01)
+                if (choice < 0)
                 {
                     return chromosome.MutateChangeNode(rnd.Next, n => RandomNode());
                 }
 
-                if (choice < 0.2)
+                if (choice < 0.4)
                 {
                     return chromosome.MutateAddEdge(rnd.Next, rnd.NextGaussian(0, 2));
                 }
 
-                if (choice < 0.2)
+                if (choice < 0)
                 {
                     return chromosome.MutateCollapseNode(rnd.Next);
                 }
 
-                if (choice < 0.35)
+                if (choice < 0)
                 {
                     return chromosome.MutateDeleteNode(rnd.Next);
                 }
