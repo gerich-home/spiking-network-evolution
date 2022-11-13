@@ -12,11 +12,11 @@ namespace SpikingNeuroEvolution
         {
             if (InputGenes.Any(gene => Chromosome.NodeGenes[gene].NodeType != NodeType.Input))
             {
-                throw new ArgumentException("Non-input gene passed");
+                throw new ArgumentException("Non-input gene passed in input genes");
             }
             if (OutputGenes.Any(gene => Chromosome.NodeGenes[gene].NodeType != NodeType.Output))
             {
-                throw new ArgumentException("Non-output gene passed");
+                throw new ArgumentException("Non-output gene passed in output genes");
             }
         }
 
@@ -61,16 +61,15 @@ namespace SpikingNeuroEvolution
                     0.0;
                 
                 double incomingTotal = edgesByTo.TryGetValue(nodeGeneType, out var inEdges) ?
-                    Aggregate(
-                        nodeGene.AggregationType,
+                    nodeGene.AggregationType.AggregateFunction(
                         inEdges.Select(
                             fromNode => nodeOutput[fromNode] *
                                 Chromosome.EdgeGenes[new EdgeGeneType(fromNode, nodeGeneType)].Weight
-                            )
-                        ) :
+                        )
+                    ) :
                     0.0;
 
-                nodeOutput[nodeGeneType] = NodeFunc(Chromosome.NodeGenes[nodeGeneType])(input + incomingTotal);
+                nodeOutput[nodeGeneType] = Chromosome.NodeGenes[nodeGeneType].FunctionType.NodeFunc(input + incomingTotal);
 
                 if (!edgesByFrom.TryGetValue(nodeGeneType, out var outEdges))
                 {
@@ -94,28 +93,5 @@ namespace SpikingNeuroEvolution
 
             return OutputGenes.Select(gene => nodeOutput[gene]).ToImmutableArray();
         }
-
-        private double Aggregate(AggregationType aggregationType, IEnumerable<double> inputs) => aggregationType switch
-        {
-            AggregationType.Sum => inputs.Sum(),
-            AggregationType.Avg => inputs.Average(),
-            AggregationType.Multiply => inputs.Aggregate(1.0, (x, y) => x * y),
-            AggregationType.Max => inputs.Max(),
-            AggregationType.Min => inputs.Min(),
-            AggregationType.MinAbs => inputs.Min(),
-            AggregationType.MaxAbs => inputs.Max(),
-            _ => throw new ArgumentException()
-        };
-
-        Func<double, double> NodeFunc(NodeGene nodeGene) => nodeGene.FunctionType switch
-        {
-            FunctionType.Identity => x => x,
-            FunctionType.Heaviside => x => x > 0 ? 1 : 0,
-            FunctionType.Sigmoid => x => 1 / (1 + Exp(-4.9 * x)),
-            FunctionType.Sin => Sin,
-            FunctionType.Exponent => Exp,
-            FunctionType.Log => x => x <= 0 ? 0 : Log(x),
-            _ => throw new ArgumentException()
-        };
     }
 }
