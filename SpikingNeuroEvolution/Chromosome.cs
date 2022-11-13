@@ -13,6 +13,11 @@ namespace SpikingNeuroEvolution
         private string NodesString => string.Join(", ", NodeGenes.Keys.Select(n => n.ShortId).OrderBy(x => x));
         private string EdgesString => string.Join(", ", EdgeGenes.Select(e => $"[{e.Key.From.ShortId}->{e.Key.To.ShortId}:{e.Value.Weight}{(e.Value.IsEnabled ? "" : "DIS")}]"));
 
+        public ImmutableArray<KeyValuePair<EdgeGeneType, EdgeGene>> EnabledEdges =>
+            EdgeGenes
+                .Where(edgeGene => edgeGene.Value.IsEnabled)
+                .ToImmutableArray();
+
         public static Chromosome Build(
             Action<ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder, ImmutableDictionary<NodeGeneType, NodeGene>.Builder> build
         ) =>

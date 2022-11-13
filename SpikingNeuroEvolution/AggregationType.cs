@@ -13,5 +13,7 @@ namespace SpikingNeuroEvolution
         public static readonly AggregationType Min = new AggregationType("Sin", inputs => inputs.Min());
         public static readonly AggregationType MaxAbs = new AggregationType("MaxAbs", inputs => inputs.Max(Math.Abs));
         public static readonly AggregationType MinAbs = new AggregationType("MinAbs", inputs => inputs.Min(Math.Abs));
+
+        public override string ToString() => Name;
     }
 }

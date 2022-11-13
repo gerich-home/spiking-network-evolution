@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using static System.Math;
 
 namespace SpikingNeuroEvolution
 {
@@ -22,76 +21,31 @@ namespace SpikingNeuroEvolution
 
         public ImmutableArray<double> Calculate(ImmutableArray<double> inputValues)
         {
-            var enabledEdges = Chromosome.EdgeGenes
-                            .Where(edgeGene => edgeGene.Value.IsEnabled)
-                            .ToImmutableArray();
-            var edgesByFrom = enabledEdges
-                .GroupBy(pair => pair.Key.From)
-                .ToImmutableDictionary(g => g.Key, g => g.Select(pair => pair.Key.To).ToImmutableArray());
+            var enabledEdges = Chromosome.EnabledEdges;
+            var edgesByFrom = GroupEdgesByFrom(enabledEdges);
+            var edgesByTo = GroupEdgesByTo(enabledEdges);
+            var nodeInput = BuildNodeInput(inputValues);
 
-            var edgesByTo = enabledEdges
-                .GroupBy(pair => pair.Key.To)
-                .ToImmutableDictionary(g => g.Key, g => g.Select(pair => pair.Key.From).ToImmutableArray());
+            var calculation = new CPPNCalculation(Chromosome, enabledEdges, edgesByFrom, edgesByTo, nodeInput);
 
-            var dependenciesCount = Chromosome.NodeGenes.Keys
-                .ToDictionary(geneType => geneType, dependenciesCount => 0.0);
-            enabledEdges.Each(edgeGene => dependenciesCount[edgeGene.Key.To]++);
-
-            var nodeInput = InputGenes
-                .Zip(inputValues)
-                .ToImmutableDictionary(pair => pair.First, pair => pair.Second);
-
-            var nodeOutput = Chromosome.NodeGenes.Keys
-                .ToDictionary(geneType => geneType, _ => 0.0);
-
-            var nodesToVisit = new Queue<NodeGeneType>(dependenciesCount
-                .Where(pair => pair.Value == 0)
-                .Select(pair => pair.Key));
-
-            var visitedNodes = new HashSet<NodeGeneType>();
-
-            while (nodesToVisit.Count > 0)
-            {
-                var nodeGeneType = nodesToVisit.Dequeue();
-                var nodeGene = Chromosome.NodeGenes[nodeGeneType];
-                visitedNodes.Add(nodeGeneType);
-
-                double input = nodeInput.TryGetValue(nodeGeneType, out var externalInput) ?
-                    externalInput :
-                    0.0;
-                
-                double incomingTotal = edgesByTo.TryGetValue(nodeGeneType, out var inEdges) ?
-                    nodeGene.AggregationType.AggregateFunction(
-                        inEdges.Select(
-                            fromNode => nodeOutput[fromNode] *
-                                Chromosome.EdgeGenes[new EdgeGeneType(fromNode, nodeGeneType)].Weight
-                        )
-                    ) :
-                    0.0;
-
-                nodeOutput[nodeGeneType] = Chromosome.NodeGenes[nodeGeneType].FunctionType.NodeFunc(input + incomingTotal);
-
-                if (!edgesByFrom.TryGetValue(nodeGeneType, out var outEdges))
-                {
-                    continue;
-                }
-
-                foreach (var to in outEdges)
-                {
-                    dependenciesCount[to]--;
-
-                    if (dependenciesCount[to] == 0)
-                    {
-                        nodesToVisit.Enqueue(to);
-                    }
-                }
-            }
-
-            if (visitedNodes.Count < Chromosome.NodeGenes.Count) {
-                throw new LoopInCPPNException();
-            }
+            var nodeOutput = calculation.Calculate();
 
             return OutputGenes.Select(gene => nodeOutput[gene]).ToImmutableArray();
         }
+
+        private static ImmutableDictionary<NodeGeneType, ImmutableArray<NodeGeneType>> GroupEdgesByTo(ImmutableArray<KeyValuePair<EdgeGeneType, EdgeGene>> enabledEdges) =>
+            enabledEdges
+                .GroupBy(pair => pair.Key.To)
+                .ToImmutableDictionary(g => g.Key, g => g.Select(pair => pair.Key.From).ToImmutableArray());
+
+        private static ImmutableDictionary<NodeGeneType, ImmutableArray<NodeGeneType>> GroupEdgesByFrom(ImmutableArray<KeyValuePair<EdgeGeneType, EdgeGene>> enabledEdges) =>
+            enabledEdges
+                .GroupBy(pair => pair.Key.From)
+                .ToImmutableDictionary(g => g.Key, g => g.Select(pair => pair.Key.To).ToImmutableArray());
+
+        private ImmutableDictionary<NodeGeneType, double> BuildNodeInput(ImmutableArray<double> inputValues) =>
+            InputGenes
+                .Zip(inputValues)
+                .ToImmutableDictionary(pair => pair.First, pair => pair.Second);
     }
 }
