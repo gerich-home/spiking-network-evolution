@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/SpikingNeuroEvolution/bin/Debug/net5.0/SpikingNeuroEvolution.dll",
+            "program": "${workspaceFolder}/SpikingNeuroEvolution/bin/Debug/net6.0/SpikingNeuroEvolution.dll",
             "args": [],
             "cwd": "${workspaceFolder}/SpikingNeuroEvolution",
             "console": "internalConsole",

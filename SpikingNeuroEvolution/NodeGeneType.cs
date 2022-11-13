@@ -6,10 +6,17 @@ using System.Linq;
 
 namespace SpikingNeuroEvolution
 {
-    struct NodeGeneType
+    readonly record struct NodeGeneType
     {
+        public string InnovationId {get;}
+
+        public NodeGeneType(string innovationId)
+        {
+            InnovationIds.TryAdd(innovationId, 1);
+            InnovationId = innovationId;
+        }
+
         public static ConcurrentDictionary<string, byte> InnovationIds = new ConcurrentDictionary<string, byte>();
-        public readonly string InnovationId;
 
         public override string ToString() => $"Node[{ShortId}]";
         public string ShortId => ShortenId(InnovationId);
@@ -31,23 +38,6 @@ namespace SpikingNeuroEvolution
             }
 
             return id.Substring(0, Math.Min(maxPrefix + 1, id.Length));
-        }
-
-        public NodeGeneType(string innovationId)
-        {
-            InnovationIds.TryAdd(innovationId, 1);
-            InnovationId = innovationId;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is NodeGeneType type &&
-                   InnovationId == type.InnovationId;
-        }
-
-        public override int GetHashCode()
-        {
-            return InnovationId.GetHashCode();
         }
 
         public static string RandomInnovationId() =>

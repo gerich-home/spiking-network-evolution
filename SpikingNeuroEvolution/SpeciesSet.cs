@@ -4,16 +4,9 @@ using System.Linq;
 
 namespace SpikingNeuroEvolution
 {
-    class SpeciesSet
+    record class SpeciesSet(ImmutableDictionary<Chromosome, Species> ChromosomesToSpecies)
     {
-        private ImmutableDictionary<Chromosome, Species> ChromosomesToSpecies { get; }
-        public ImmutableList<Species> AllSpecies { get; }
-
-        private SpeciesSet(ImmutableDictionary<Chromosome, Species> chromosomesToSpecies)
-        {
-            ChromosomesToSpecies = chromosomesToSpecies;
-            AllSpecies = ChromosomesToSpecies.Values.Distinct().ToImmutableList();
-        }
+        public ImmutableList<Species> AllSpecies { get; } = ChromosomesToSpecies.Values.Distinct().ToImmutableList();
 
         public Species GetSpecies(Chromosome chromosome) => ChromosomesToSpecies[chromosome];
         public int Count => AllSpecies.Count;

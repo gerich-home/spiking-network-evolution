@@ -6,23 +6,15 @@ using static System.Math;
 
 namespace SpikingNeuroEvolution
 {
-    class CPPN
+    record class CPPN(Chromosome Chromosome, ImmutableArray<NodeGeneType> InputGenes, ImmutableArray<NodeGeneType> OutputGenes)
     {
-        public readonly Chromosome Chromosome;
-        public readonly ImmutableArray<NodeGeneType> InputGenes;
-        public readonly ImmutableArray<NodeGeneType> OutputGenes;
-
-        public CPPN(Chromosome chromosome, ImmutableArray<NodeGeneType> inputGenes, ImmutableArray<NodeGeneType> outputGenes)
+        public void Validate()
         {
-            Chromosome = chromosome;
-            InputGenes = inputGenes;
-            OutputGenes = outputGenes;
-
-            if (inputGenes.Any(gene => chromosome.NodeGenes[gene].NodeType != NodeType.Input))
+            if (InputGenes.Any(gene => Chromosome.NodeGenes[gene].NodeType != NodeType.Input))
             {
                 throw new ArgumentException("Non-input gene passed");
             }
-            if (outputGenes.Any(gene => chromosome.NodeGenes[gene].NodeType != NodeType.Output))
+            if (OutputGenes.Any(gene => Chromosome.NodeGenes[gene].NodeType != NodeType.Output))
             {
                 throw new ArgumentException("Non-output gene passed");
             }
@@ -103,48 +95,27 @@ namespace SpikingNeuroEvolution
             return OutputGenes.Select(gene => nodeOutput[gene]).ToImmutableArray();
         }
 
-        private double Aggregate(AggregationType aggregationType, IEnumerable<double> inputs)
+        private double Aggregate(AggregationType aggregationType, IEnumerable<double> inputs) => aggregationType switch
         {
-            switch(aggregationType) 
-            {
-                case AggregationType.Sum:
-                    return inputs.Sum();
-                case AggregationType.Avg:
-                    return inputs.Average();
-                case AggregationType.Multiply:
-                    return inputs.Aggregate(1.0, (x, y) => x * y);
-                case AggregationType.Max:
-                    return inputs.Max();
-                case AggregationType.Min:
-                    return inputs.Min();
-                case AggregationType.MinAbs:
-                    return inputs.Min();
-                case AggregationType.MaxAbs:
-                    return inputs.Max();
-            }
+            AggregationType.Sum => inputs.Sum(),
+            AggregationType.Avg => inputs.Average(),
+            AggregationType.Multiply => inputs.Aggregate(1.0, (x, y) => x * y),
+            AggregationType.Max => inputs.Max(),
+            AggregationType.Min => inputs.Min(),
+            AggregationType.MinAbs => inputs.Min(),
+            AggregationType.MaxAbs => inputs.Max(),
+            _ => throw new ArgumentException()
+        };
 
-            throw new ArgumentException();
-        }
-
-        Func<double, double> NodeFunc(NodeGene nodeGene)
+        Func<double, double> NodeFunc(NodeGene nodeGene) => nodeGene.FunctionType switch
         {
-            switch (nodeGene.FunctionType)
-            {
-                case FunctionType.Identity:
-                    return x => x;
-                case FunctionType.Heaviside:
-                    return x => x > 0 ? 1 : 0;
-                case FunctionType.Sigmoid:
-                    return x => 1 / (1 + Exp(-4.9 * x));
-                case FunctionType.Sin:
-                    return Sin;
-                case FunctionType.Exponent:
-                    return Exp;
-                case FunctionType.Log:
-                    return x => x <= 0 ? 0 : Log(x);
-            }
-
-            throw new ArgumentException();
-        }
+            FunctionType.Identity => x => x,
+            FunctionType.Heaviside => x => x > 0 ? 1 : 0,
+            FunctionType.Sigmoid => x => 1 / (1 + Exp(-4.9 * x)),
+            FunctionType.Sin => Sin,
+            FunctionType.Exponent => Exp,
+            FunctionType.Log => x => x <= 0 ? 0 : Log(x),
+            _ => throw new ArgumentException()
+        };
     }
 }

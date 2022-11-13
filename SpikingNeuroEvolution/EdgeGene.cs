@@ -1,47 +1,21 @@
 namespace SpikingNeuroEvolution
 {
-    class EdgeGene
+    record class EdgeGene(double Weight, bool IsEnabled)
     {
-        public readonly double Weight;
-        public readonly bool IsEnabled;
-
         public override string ToString() => $"{Weight}{(IsEnabled ? "" : "(off)")}";
 
         public double ActualWeight => IsEnabled ? Weight : 0;
 
-        public EdgeGene(double weight, bool isEnabled)
-        {
-            Weight = weight;
-            IsEnabled = isEnabled;
-        }
+        public EdgeGene Disable() => ChangeEnabled(false);
 
-        public EdgeGene Disable()
-        {
-            return ChangeEnabled(false);
-        }
+        public EdgeGene Enable() => ChangeEnabled(true);
 
-        public EdgeGene Enable()
-        {
-            return ChangeEnabled(true);
-        }
-
-        public EdgeGene ToggleEnabled()
-        {
-            return ChangeEnabled(!IsEnabled);
-        }
+        public EdgeGene ToggleEnabled() => ChangeEnabled(!IsEnabled);
 
         public EdgeGene ChangeEnabled(bool newIsEnabled)
-        {
-            return IsEnabled == newIsEnabled
-                ? this
-                : new EdgeGene(Weight, newIsEnabled);
-        }
+            => this with {IsEnabled = newIsEnabled};
 
         public EdgeGene ChangeWeight(double newWeight)
-        {
-            return Weight != newWeight
-                ? new EdgeGene(newWeight, IsEnabled)
-                : this;
-        }
+            => this with {Weight = newWeight};
     }
 }

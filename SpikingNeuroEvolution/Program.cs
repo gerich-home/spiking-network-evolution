@@ -53,6 +53,7 @@ namespace SpikingNeuroEvolution
             );
 
             var cppn = new CPPN(a, ImmutableArray.Create(n1, n2), ImmutableArray.Create(n4));
+            cppn.Validate();
 
             Console.WriteLine(cppn.Calculate(ImmutableArray.Create(1.0, 1.0))[0]);
             // n4 = n3 + n1

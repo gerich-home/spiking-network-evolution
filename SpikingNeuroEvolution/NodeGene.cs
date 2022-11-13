@@ -1,20 +1,19 @@
+using System;
+
 namespace SpikingNeuroEvolution
 {
 
-    struct NodeGene
+    record class NodeGene(FunctionType FunctionType, AggregationType AggregationType, NodeType NodeType)
     {
-        public readonly FunctionType FunctionType;
-        public readonly NodeType NodeType;
-        public readonly AggregationType AggregationType;
 
         public override string ToString() => $"{ShortNodeType}[{AggregationType}, {FunctionType}]";
 
-        private string ShortNodeType => NodeType == NodeType.Inner ? "" : (NodeType == NodeType.Output ? "OUT ": "IN  ");
-        public NodeGene(FunctionType functionType, AggregationType aggregationType, NodeType nodeType)
+        private string ShortNodeType => NodeType switch
         {
-            FunctionType = functionType;
-            AggregationType = aggregationType;
-            NodeType = nodeType;
-        }
+            NodeType.Inner => "",
+            NodeType.Output => "OUT ",
+            NodeType.Input => "IN  ",
+            _ => throw new ArgumentException()
+        };
     }
 }

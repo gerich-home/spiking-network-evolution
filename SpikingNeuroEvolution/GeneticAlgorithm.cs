@@ -72,6 +72,7 @@ namespace SpikingNeuroEvolution
                 try
                 {
                     var cppn = new CPPN(chromosome, inputGenes, outputGenes);
+                    cppn.Validate();
 
                     double worst = 0;
 
@@ -101,6 +102,7 @@ namespace SpikingNeuroEvolution
             double EvaluatePhenotype(Chromosome chromosome, (double, double) example)
             {
                 var cppn = new CPPN(chromosome, inputGenes, outputGenes);
+                cppn.Validate();
                 var (x, y) = example;
 
                 return cppn.Calculate(ImmutableArray.Create(1, x, y))[0];
@@ -191,116 +193,39 @@ namespace SpikingNeuroEvolution
                 }
             }
 
-            Chromosome Mutate(Chromosome chromosome)
+            Chromosome Mutate(Chromosome chromosome) => rnd.NextDouble() switch
             {
-                var choice = rnd.NextDouble();
+                < 0.2 => chromosome.MutateAddNode(rnd.Next, RandomNode()),
+                < 0.3 => chromosome.MutateChangeNode(rnd.Next, n => RandomNode()),
+                < 0.4 => chromosome.MutateAddEdge(rnd.Next, rnd.NextGaussian(0, 2)),
+                < 0.5 => chromosome.MutateCollapseNode(rnd.Next),
+                < 0.6 => chromosome.MutateDeleteNode(rnd.Next),
+                < 0.9 => chromosome.MutateChangeWeight(rnd.Next, rnd.NextGaussian(0, 10)),
+                _ => chromosome.MutateChangeEnabled(rnd.Next)
+            };
 
-                if (choice < 0.2)
-                {
-                    return chromosome.MutateAddNode(rnd.Next, RandomNode());
-                }
+            NodeGene RandomNode() => new NodeGene(ChooseNodeType(), ChooseAggregationType(), NodeType.Inner);
 
-                if (choice < 0)
-                {
-                    return chromosome.MutateChangeNode(rnd.Next, n => RandomNode());
-                }
-
-                if (choice < 0.4)
-                {
-                    return chromosome.MutateAddEdge(rnd.Next, rnd.NextGaussian(0, 2));
-                }
-
-                if (choice < 0)
-                {
-                    return chromosome.MutateCollapseNode(rnd.Next);
-                }
-
-                if (choice < 0)
-                {
-                    return chromosome.MutateDeleteNode(rnd.Next);
-                }
-
-                if (choice < 0.9)
-                {
-                    return chromosome.MutateChangeWeight(rnd.Next, rnd.NextGaussian(0, 10));
-                }
-
-                return chromosome.MutateChangeEnabled(rnd.Next);
-            }
-
-            NodeGene RandomNode()
+            FunctionType ChooseNodeType() => rnd.NextDouble() switch
             {
-                return new NodeGene(ChooseNodeType(), ChooseAggregationType(), NodeType.Inner);
-            }
+                < 0.05 => FunctionType.Sin,
+                < 0.1 => FunctionType.Log,
+                < 0.15 => FunctionType.Exponent,
+                < 0.2 => FunctionType.Heaviside,
+                < 0.25 => FunctionType.Sigmoid,
+                _ => FunctionType.Identity
+            };
 
-            FunctionType ChooseNodeType()
+            AggregationType ChooseAggregationType() => rnd.NextDouble() switch
             {
-                var choice = rnd.NextDouble();
-
-                if (choice < 0.05)
-                {
-                    return FunctionType.Sin;
-                }
-
-                if (choice < 0.1)
-                {
-                    return FunctionType.Log;
-                }
-
-                if (choice < 0.15)
-                {
-                    return FunctionType.Exponent;
-                }
-
-                if (choice < 0.2)
-                {
-                    return FunctionType.Heaviside;
-                }
-
-                if (choice < 0.25)
-                {
-                    return FunctionType.Sigmoid;
-                }
-
-                return FunctionType.Identity;
-            }
-
-            AggregationType ChooseAggregationType()
-            {
-                var choice = rnd.NextDouble();
-
-                if (choice < 0.2)
-                {
-                    return AggregationType.Multiply;
-                }
-
-                if (choice < 0.25)
-                {
-                    return AggregationType.Avg;
-                }
-
-                if (choice < 0.3)
-                {
-                    return AggregationType.Max;
-                }
-
-                if (choice < 0.35)
-                {
-                    return AggregationType.MaxAbs;
-                }
-
-                if (choice < 0.4)
-                {
-                    return AggregationType.Min;
-                }
-
-                if (choice < 0.45)
-                {
-                    return AggregationType.MinAbs;
-                }
-
-                return AggregationType.Sum;
-            }
+                < 0.2 => AggregationType.Multiply,
+                < 0.25 => AggregationType.Avg,
+                < 0.3 => AggregationType.Max,
+                < 0.35 => AggregationType.MaxAbs,
+                < 0.4 => AggregationType.Min,
+                < 0.45 => AggregationType.MinAbs,
+                _ => AggregationType.Sum
+            };
         }
 
         private static (Chromosome, ImmutableArray<NodeGeneType>, ImmutableArray<NodeGeneType>) CreateSeedChromosome(int inputGenesCount, int outputGenesCount)

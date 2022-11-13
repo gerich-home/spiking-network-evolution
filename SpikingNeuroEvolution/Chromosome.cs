@@ -6,22 +6,12 @@ using System.Linq;
 
 namespace SpikingNeuroEvolution
 {
-    class Chromosome
+    record class Chromosome(ImmutableDictionary<NodeGeneType, NodeGene> NodeGenes, ImmutableDictionary<EdgeGeneType, EdgeGene> EdgeGenes)
     {
-        public readonly ImmutableDictionary<NodeGeneType, NodeGene> NodeGenes;
-        public readonly ImmutableDictionary<EdgeGeneType, EdgeGene> EdgeGenes;
-
         public override string ToString() => $"Chromosome: {{Nodes: [{NodesString}], Edges: [{EdgesString}]}}";
 
         private string NodesString => string.Join(", ", NodeGenes.Keys.Select(n => n.ShortId).OrderBy(x => x));
         private string EdgesString => string.Join(", ", EdgeGenes.Select(e => $"[{e.Key.From.ShortId}->{e.Key.To.ShortId}:{e.Value.Weight}{(e.Value.IsEnabled ? "" : "DIS")}]"));
-
-        public Chromosome(ImmutableDictionary<NodeGeneType, NodeGene> nodeGenes, ImmutableDictionary<EdgeGeneType, EdgeGene> edgeGenes)
-        {
-            CheckValid(nodeGenes, edgeGenes);
-            NodeGenes = nodeGenes;
-            EdgeGenes = edgeGenes;
-        }
 
         public static Chromosome Build(
             Action<ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder, ImmutableDictionary<NodeGeneType, NodeGene>.Builder> build
@@ -53,15 +43,16 @@ namespace SpikingNeuroEvolution
         private static Chromosome BuildInner(ImmutableDictionary<NodeGeneType, NodeGene>.Builder nodeGenesBuilder, ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder edgeGenesBuilder, Action<ImmutableDictionary<EdgeGeneType, EdgeGene>.Builder, ImmutableDictionary<NodeGeneType, NodeGene>.Builder> build)
         {
             build(edgeGenesBuilder, nodeGenesBuilder);
+            
+            var nodeGenes = nodeGenesBuilder.ToImmutable();
+            var edgeGenes = edgeGenesBuilder.ToImmutable();
+            CheckValid(nodeGenes, edgeGenes);
 
-            return new Chromosome(
-                nodeGenesBuilder.ToImmutable(),
-                edgeGenesBuilder.ToImmutable()
-            );
+            return new Chromosome(nodeGenes, edgeGenes);
         }
 
         [Conditional("DEBUG")]
-        private void CheckValid(
+        private static void CheckValid(
             ImmutableDictionary<NodeGeneType, NodeGene> nodeGenes,
             ImmutableDictionary<EdgeGeneType, EdgeGene> edgeGenes
         )
