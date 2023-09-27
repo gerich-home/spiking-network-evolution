@@ -2,7 +2,7 @@
 Небольшой pet-project.
 
 Есть метод [HyperNEAT](https://en.wikipedia.org/wiki/HyperNEAT) для построения генетического алгоритма, умеющего эволюционировать нейронную сеть, а точнее [CPPN](https://en.wikipedia.org/wiki/Compositional_pattern-producing_network) (compositional pattern-producing network), способную генерировать нейронную сеть.
-С другой стороны, есть [Spiking Neural Network](https://en.wikipedia.org/wiki/Spiking_neural_network) (нейронная сеть, максимально близко моделирующая реальную биологическую нейронную сеть), основанная на [модели](https://en.wikipedia.org/wiki/Biological_neuron_model#Hodgkin–Huxley) биологического нейрона.
+С другой стороны, есть [Spiking Neural Network](https://en.wikipedia.org/wiki/Spiking_neural_network) (нейронная сеть, максимально близко моделирующая реальную биологическую нейронную сеть), основанная на [модели](https://en.wikipedia.org/wiki/Biological_neuron_model#Hodgkin–Huxley) биологического нейрона (ещё, классно описано во тут https://neuronaldynamics.epfl.ch/online/).
 
 Этот проект - песочница, где я (время от времени) пытаюсь "подружить" эти 2 алгоритма.
 
